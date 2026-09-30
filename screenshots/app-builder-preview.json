@@ -1,0 +1,36 @@
+{
+  "url": "http://127.0.0.1:8080/",
+  "viewports": {
+    "desktop": {
+      "width": 1280,
+      "height": 800,
+      "status": 200,
+      "title": "Авто-Эмир",
+      "hasCanvas": false,
+      "bodyTextLen": 3427,
+      "bodyTextHash": "07f01f1093537d5add1d0c5e32477439b9e3f08a7121e4caf3583dbd63fbb2fa",
+      "bodyTextPrefix": "Авто-Эмир АВТОШКОЛА Цены О школе Запись Контакты RU KZ Позвонить",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-preview.png"
+    },
+    "mobile": {
+      "width": 390,
+      "height": 844,
+      "status": 200,
+      "title": "Авто-Эмир",
+      "hasCanvas": false,
+      "bodyTextLen": 3360,
+      "bodyTextHash": "0b129fa458dc22688c12e09b5f45816ce2311eaca9e3f6116bef3c22f99d5f76",
+      "bodyTextPrefix": "Авто-Эмир АВТОШКОЛА RU KZ 8 НА САЙТЕ 186 УЧЕНИКОВ 00:00 ВАШЕ ВРЕ",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-preview-mobile.png"
+    }
+  },
+  "brandWarnings": [],
+  "authWarnings": [],
+  "verdictFile": "/workspace/screenshots/app-builder-preview.json"
+}
