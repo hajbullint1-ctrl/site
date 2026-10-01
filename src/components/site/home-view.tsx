@@ -75,7 +75,7 @@ export function HomeView({ payload }: { payload: SitePayload }) {
               </Button>
             </div>
             <dl className="mt-10 grid grid-cols-2 gap-4 sm:grid-cols-4">
-              <Trust value="5.0" label={t(тест, "trust.rating", lang)} />
+              <Trust value="5.0" label={t(texts, "trust.rating", lang)} />
               <Trust value="A B C" label={t(texts, "trust.categories", lang)} />
               <Trust value="2" label={t(texts, "trust.languages", lang)} />
               <Trust value="У" label={t(texts, "trust.autodrome", lang)} />
