@@ -348,7 +348,7 @@ function Trust({ label, value }: { label: string; value: string }) {
   return (
     <div>
       <dt className="font-display text-lg tracking-tight text-fg">{label}</dt>
-      <dd className="mt-1 text-[11px] leading-snug text-muted">{value}</dd>
+      <dd className="mt-1 text-[11px] leading-snug text-fg">{value}</dd>
     </div>
   );
 }
