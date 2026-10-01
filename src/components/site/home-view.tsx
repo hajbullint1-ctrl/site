@@ -382,7 +382,7 @@ function ContactRow({
 }) {
   return (
     <div>
-      <dt className="text-xs uppercase tracking-[0.16em] text-muted">{label}</dt>
+      <dt className="text-xs uppercase tracking-[0.16em] text-fg">{label}</dt>
       <dd className="mt-1 text-base">
         {href ? (
           <a href={href} className="hover:underline">
