@@ -70,3 +70,15 @@ create table if not exists admin_auth (
   token text,
   token_expires timestamptz
 );
+-- Наполнение таблицы услуг (категорий и цен)
+INSERT INTO services (code, title_ru, title_kz, desc_ru, desc_kz, price, duration_ru, duration_kz, hours, featured, sort_order)
+VALUES
+  ('A', 'Категория A (Мотоциклы)', 'A категориясы', 'Полный курс подготовки водителей мотоциклов', 'Толық мотоцикл жүргізу курсы', 30000, '1.5 месяца', '1.5 ай', 20, false, 1),
+  ('B', 'Категория B (Легковые авто)', 'B категориясы', 'Полный теоретический и практический курс', 'Толық теориялық және практикалық курс', 45000, '2.5 месяца', '2.5 ай', 40, true, 2),
+  ('BC1', 'Категория BC1 (Грузовые)', 'BC1 категориясы', 'Подготовка водителей грузовых автомобилей', 'Жүк көліктерін жүргізушілерді даярлау', 65000, '3 месяца', '3 ай', 50, false, 3)
+ON CONFLICT (code) DO UPDATE SET price = EXCLUDED.price;
+
+-- Базовые контакты (чтобы не было ошибок на сайте)
+INSERT INTO contacts (id, phone, whatsapp, address_ru, address_kz)
+VALUES (1, '+7 (700) 000-00-00', '+7 (700) 000-00-00', 'г. Кентау', 'Кентау қ.')
+ON CONFLICT (id) DO NOTHING;
