@@ -75,10 +75,10 @@ export function HomeView({ payload }: { payload: SitePayload }) {
               </Button>
             </div>
             <dl className="mt-10 grid grid-cols-2 gap-4 sm:grid-cols-4">
-              <Trust label="5.0" value={t(texts, "trust.rating", lang)} />
-              <Trust label="A B C" value={t(texts, "trust.categories", lang)} />
-              <Trust label="2" value={t(texts, "trust.languages", lang)} />
-              <Trust label="У" value={t(texts, "trust.autodrome", lang)} />
+              <Trust value="5.0" label={t(texts, "trust.rating", lang)} />
+              <Trust value="A B C" label={t(texts, "trust.categories", lang)} />
+              <Trust value="2" label={t(texts, "trust.languages", lang)} />
+              <Trust value="У" label={t(texts, "trust.autodrome", lang)} />
             </dl>
           </div>
           <div className="relative">
