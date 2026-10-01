@@ -8,7 +8,7 @@ export function t(
   lang: Lang,
   fallback = "",
 ): string {
-  const row = texts[key];
+  const row = texts.find((item) => item.key === key);
   if (!row) return fallback;
   const value = lang === "kz" ? row.kz : row.ru;
   return value || row.ru || row.kz || fallback;
