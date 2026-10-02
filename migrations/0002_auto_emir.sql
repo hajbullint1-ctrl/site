@@ -63,25 +63,26 @@ create table if not exists reviews (
   rating integer not null default 5,
   sort_order integer not null default 0
 );
-
-create table if not exists admin_auth (
-  id integer primary key default 1,
-  password_hash text not null,
-  token text,
-  token_expires timestamptz
+-- Таблица авторизации админа
+CREATE TABLE IF NOT EXISTS admin_auth (
+  id INT PRIMARY KEY DEFAULT 1,
+  password_hash TEXT NOT NULL
 );
--- Наполнение таблицы услуг (категорий и цен)
-INSERT INTO services (code, title_ru, title_kz, desc_ru, desc_kz, price, duration_ru, duration_kz, hours, featured, sort_order)
-VALUES
-  ('A', 'Категория A (Мотоциклы)', 'A категориясы', 'Полный курс подготовки водителей мотоциклов', 'Толық мотоцикл жүргізу курсы', 30000, '1.5 месяца', '1.5 ай', 20, false, 1),
-  ('B', 'Категория B (Легковые авто)', 'B категориясы', 'Полный теоретический и практический курс', 'Толық теориялық және практикалық курс', 45000, '2.5 месяца', '2.5 ай', 40, true, 2),
-  ('BC1', 'Категория BC1 (Грузовые)', 'BC1 категориясы', 'Подготовка водителей грузовых автомобилей', 'Жүк көліктерін жүргізушілерді даярлау', 65000, '3 месяца', '3 ай', 50, false, 3)
-ON CONFLICT (code) DO UPDATE SET price = EXCLUDED.price;
 
--- Базовые контакты (чтобы не было ошибок на сайте)
-INSERT INTO contacts (id, phone, whatsapp, address_ru, address_kz)
-VALUES (1, '+7 (700) 000-00-00', '+7 (700) 000-00-00', 'г. Кентау', 'Кентау қ.')
-ON CONFLICT (id) DO NOTHING;
-INSERT INTO admin_auth (id, password_hash)
-VALUES (1, 'student2026')
-ON CONFLICT (id) DO UPDATE SET password_hash = EXCLUDED.password_hash;
+DELETE FROM admin_auth WHERE id = 1;
+INSERT INTO admin_auth (id, password_hash) VALUES (1, 'student2026');
+
+-- Таблица категорий и цен
+CREATE TABLE IF NOT EXISTS categories (
+  id SERIAL PRIMARY KEY,
+  name TEXT NOT NULL,
+  price TEXT NOT NULL,
+  description TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+INSERT INTO categories (name, price, description)
+VALUES 
+  ('Категория B', '45 000-50 000 ₸', 'Полный курс обучения вождению'),
+  ('Категория C', '55 000-60 000 ₸', 'Грузовые автомобили')
+ON CONFLICT DO NOTHING;
