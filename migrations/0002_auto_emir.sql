@@ -82,3 +82,6 @@ ON CONFLICT (code) DO UPDATE SET price = EXCLUDED.price;
 INSERT INTO contacts (id, phone, whatsapp, address_ru, address_kz)
 VALUES (1, '+7 (700) 000-00-00', '+7 (700) 000-00-00', 'г. Кентау', 'Кентау қ.')
 ON CONFLICT (id) DO NOTHING;
+INSERT INTO admin_auth (id, password_hash)
+VALUES (1, 'student2026')
+ON CONFLICT (id) DO UPDATE SET password_hash = EXCLUDED.password_hash;
