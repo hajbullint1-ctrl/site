@@ -61,11 +61,15 @@ export type Booking = {
   createdAt: string;
 };
 
-export type SitePayload = {
+/** Published site copy: texts, prices, contacts. Lives in app-data.json. */
+export type SiteContent = {
   texts: Record<string, { ru: string; kz: string }>;
   services: Service[];
   contacts: ContactInfo;
   instructors: Instructor[];
   reviews: Review[];
+};
+
+export type SitePayload = SiteContent & {
   bookingCount: number;
 };

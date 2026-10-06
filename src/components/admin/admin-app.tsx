@@ -1,71 +1,82 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
-import { Link } from "@tanstack/react-router";
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { Link } from "@tanstack/react-router";
+import { CloudUpload, Download, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { BrandLockup } from "@/components/site/logo";
 import {
-  CMS_DATA_KEY,
-  exportSiteData,
-  importSiteData,
-  isAdminSessionActive,
-  loadSiteData,
-  loadSitePayload,
-  loginAdmin,
-  logoutAdmin,
-  resetSiteData,
-  saveSiteData,
-  type SiteData,
-} from "@/lib/local-cms";
-import { cn } from "@/lib/utils";
-import type { ContactInfo, Service, SitePayload } from "@/lib/site-types";
+  adminLoginFn,
+  adminLogoutFn,
+  getSitePayload,
+  listBookingsFn,
+  parseSiteContent,
+  publishSiteFn,
+  removeBookingFn,
+  removeServiceFn,
+  saveContactsFn,
+  saveInstructorsFn,
+  saveReviewsFn,
+  saveServiceFn,
+  saveTextsFn,
+} from "@/lib/site-api";
+import {
+  contentFromPayload,
+  saveLocalContent,
+  toPrettyJson,
+  useSiteContent,
+} from "@/lib/site-content";
+import { mapGithubError } from "@/lib/github-errors";
+import { cn, waLink } from "@/lib/utils";
+import type { ContactInfo, Instructor, Review, Service, SitePayload } from "@/lib/site-types";
 
-type Tab = "texts" | "services" | "contacts" | "tools";
+const TOKEN_KEY = "ae-admin-token";
+type Tab = "texts" | "services" | "contacts" | "bookings" | "team" | "json";
 
 export function AdminApp() {
+  const [token, setToken] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
-  const [authed, setAuthed] = useState(false);
 
   useEffect(() => {
-    setAuthed(isAdminSessionActive());
+    setToken(sessionStorage.getItem(TOKEN_KEY));
     setReady(true);
   }, []);
 
-  if (!ready) {
-    return <div className="min-h-dvh bg-bg" />;
-  }
-
-  if (!authed) {
-    return <Login onSuccess={() => setAuthed(true)} />;
-  }
+  if (!ready) return <div className="min-h-dvh bg-bg" />;
+  if (!token) return <Login onToken={(t) => { sessionStorage.setItem(TOKEN_KEY, t); setToken(t); }} />;
 
   return (
     <AdminShell
+      token={token}
       onLogout={() => {
-        logoutAdmin();
-        setAuthed(false);
+        sessionStorage.removeItem(TOKEN_KEY);
+        void adminLogoutFn({ data: { token } });
+        setToken(null);
       }}
     />
   );
 }
 
-function Login({ onSuccess }: { onSuccess: () => void }) {
+function Login({ onToken }: { onToken: (token: string) => void }) {
   const [password, setPassword] = useState("");
+  const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
 
-  function onSubmit(event: FormEvent) {
-    event.preventDefault();
-
-    if (loginAdmin(password)) {
-      setPassword("");
-      setError("");
-      onSuccess();
-      return;
+  async function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    setPending(true);
+    setError("");
+    try {
+      const res = await adminLoginFn({ data: { password } });
+      onToken(res.token);
+    } catch {
+      setError("Неверный пароль");
+    } finally {
+      setPending(false);
     }
-
-    setError("Неверный пароль");
   }
 
   return (
@@ -75,36 +86,23 @@ function Login({ onSuccess }: { onSuccess: () => void }) {
         className="w-full max-w-sm rounded-xl border border-border bg-surface p-6"
       >
         <BrandLockup />
-
-        <h1 className="mt-6 font-display text-xl">Вход для студентов</h1>
-
-        <p className="mt-2 text-sm leading-relaxed text-muted">
-          Скрытая страница для изменения текстов, цен и контактов сайта.
-        </p>
-
+        <h1 className="mt-6 font-display text-xl">Кабинет школы</h1>
+        <p className="mt-2 text-sm text-muted">Пароль, чтобы править тексты, цены и заявки.</p>
         <label className="mt-6 grid gap-1.5">
           <Label>Пароль</Label>
           <Input
             type="password"
             value={password}
-            onChange={(event) => setPassword(event.target.value)}
+            onChange={(e) => setPassword(e.target.value)}
             autoComplete="current-password"
             required
           />
         </label>
-
-        {error ? (
-          <p className="mt-3 text-sm text-danger">{error}</p>
-        ) : null}
-
-        <Button type="submit" className="mt-5 w-full">
+        {error ? <p className="mt-3 text-sm text-danger">{error}</p> : null}
+        <Button type="submit" className="mt-5 w-full" disabled={pending}>
           Войти
         </Button>
-
-        <Link
-          to="/"
-          className="mt-4 block text-center text-sm text-muted hover:text-fg"
-        >
+        <Link to="/" className="mt-4 block text-center text-sm text-muted hover:text-fg">
           На сайт
         </Link>
       </form>
@@ -112,107 +110,45 @@ function Login({ onSuccess }: { onSuccess: () => void }) {
   );
 }
 
-function AdminShell({ onLogout }: { onLogout: () => void }) {
+function AdminShell({ token, onLogout }: { token: string; onLogout: () => void }) {
+  const queryClient = useQueryClient();
   const [tab, setTab] = useState<Tab>("texts");
-  const [revision, setRevision] = useState(0);
-  const [updatedAt, setUpdatedAt] = useState("");
-  const [payload, setPayload] = useState<SitePayload>(() => loadSitePayload());
+  const site = useQuery({
+    queryKey: ["site"],
+    queryFn: () => getSitePayload(),
+  });
+  const bookings = useQuery({
+    queryKey: ["bookings", token],
+    queryFn: () => listBookingsFn({ data: { token } }),
+    refetchInterval: 6000,
+  });
 
-  useEffect(() => {
-    const refresh = () => {
-      setPayload(loadSitePayload());
-      setRevision((value) => value + 1);
-    };
-
-    refresh();
-
-    const onStorage = (event: StorageEvent) => {
-      if (event.key === CMS_DATA_KEY || event.key === null) {
-        refresh();
-      }
-    };
-
-    window.addEventListener("storage", onStorage);
-
-    return () => {
-      window.removeEventListener("storage", onStorage);
-    };
-  }, []);
-
-  function saveData(patch: Partial<SiteData>) {
-    const next = {
-      ...loadSiteData(),
-      ...patch,
-    };
-
-    saveSiteData(next);
-
-    setPayload((current) => ({
-      ...next,
-      bookingCount: current.bookingCount,
-    }));
-
-    setRevision((value) => value + 1);
-    setUpdatedAt(
-      new Date().toLocaleString("ru-RU", {
-        day: "2-digit",
-        month: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
-    );
-
-    toast.success("Сохранено. Изменения не пропадут после перезагрузки.");
-  }
-
-  function reload() {
-    setPayload(loadSitePayload());
-    setRevision((value) => value + 1);
-  }
-
-  function resetAll() {
-    const data = resetSiteData();
-
-    setPayload({
-      ...data,
-      bookingCount: 0,
-    });
-
-    setRevision((value) => value + 1);
-    setUpdatedAt("");
-    toast.success("Возвращены исходные данные сайта.");
-  }
+  const live = useSiteContent(site.data);
+  const payload = live;
 
   const tabs: { id: Tab; label: string }[] = [
     { id: "texts", label: "Тексты" },
     { id: "services", label: "Цены" },
     { id: "contacts", label: "Контакты" },
-    { id: "tools", label: "JSON" },
+    { id: "team", label: "Команда" },
+    { id: "bookings", label: `Заявки (${bookings.data?.length ?? 0})` },
+    { id: "json", label: "JSON / Резервная копия" },
   ];
 
   return (
     <div className="min-h-dvh bg-bg text-fg">
       <header className="sticky top-0 z-30 border-b border-border bg-bg">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
-          <div>
-            <BrandLockup />
-            <p className="mt-1 text-xs text-muted">
-              Изменения хранятся в этом браузере
-              {updatedAt ? ` · сохранено ${updatedAt}` : ""}
-            </p>
-          </div>
-
+          <BrandLockup />
           <div className="flex items-center gap-2">
             <Button asChild variant="ghost" size="sm">
               <Link to="/">Сайт</Link>
             </Button>
-
             <Button variant="outline" size="sm" onClick={onLogout}>
               Выйти
             </Button>
           </div>
         </div>
-
         <div className="mx-auto flex max-w-6xl gap-1 overflow-x-auto px-4 pb-3">
           {tabs.map((item) => (
             <button
@@ -221,9 +157,7 @@ function AdminShell({ onLogout }: { onLogout: () => void }) {
               onClick={() => setTab(item.id)}
               className={cn(
                 "h-10 shrink-0 rounded-full px-4 text-sm",
-                tab === item.id
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted hover:text-fg",
+                tab === item.id ? "bg-primary text-primary-foreground" : "text-muted hover:text-fg",
               )}
             >
               {item.label}
@@ -235,30 +169,49 @@ function AdminShell({ onLogout }: { onLogout: () => void }) {
       <main className="mx-auto max-w-6xl px-4 py-8">
         {tab === "texts" ? (
           <TextsEditor
-            key={`texts-${revision}`}
+            key={Object.keys(payload.texts).length}
             payload={payload}
-            onSave={(texts) => saveData({ texts })}
+            token={token}
+            onSaved={() => queryClient.invalidateQueries({ queryKey: ["site"] })}
           />
         ) : null}
-
         {tab === "services" ? (
           <ServicesEditor
-            key={`services-${revision}`}
+            key={payload.services.map((s) => s.id).join("-")}
             payload={payload}
-            onSave={(services) => saveData({ services })}
+            token={token}
+            onSaved={() => queryClient.invalidateQueries({ queryKey: ["site"] })}
           />
         ) : null}
-
         {tab === "contacts" ? (
           <ContactsEditor
-            key={`contacts-${revision}`}
+            key={payload.contacts.phone}
             payload={payload}
-            onSave={(contacts) => saveData({ contacts })}
+            token={token}
+            onSaved={() => queryClient.invalidateQueries({ queryKey: ["site"] })}
           />
         ) : null}
-
-        {tab === "tools" ? (
-          <ToolsPanel onChanged={reload} onReset={resetAll} />
+        {tab === "team" ? (
+          <TeamEditor
+            key={payload.instructors.map((i) => i.id).join("-")}
+            payload={payload}
+            token={token}
+            onSaved={() => queryClient.invalidateQueries({ queryKey: ["site"] })}
+          />
+        ) : null}
+        {tab === "bookings" ? (
+          <BookingsList
+            token={token}
+            items={bookings.data ?? []}
+            onChanged={() => queryClient.invalidateQueries({ queryKey: ["bookings"] })}
+          />
+        ) : null}
+        {tab === "json" ? (
+          <JsonBackup
+            payload={payload}
+            token={token}
+            onApplied={() => queryClient.invalidateQueries({ queryKey: ["site"] })}
+          />
         ) : null}
       </main>
     </div>
@@ -267,7 +220,7 @@ function AdminShell({ onLogout }: { onLogout: () => void }) {
 
 const TEXT_GROUPS: { title: string; keys: string[] }[] = [
   {
-    title: "Шапка и первый экран",
+    title: "Шапка и герой",
     keys: [
       "meta.title",
       "meta.description",
@@ -283,21 +236,14 @@ const TEXT_GROUPS: { title: string; keys: string[] }[] = [
       "hero.lead",
       "hero.cta",
       "hero.call",
-      "trust.rating",
-      "trust.categories",
-      "trust.languages",
-      "trust.autodrome",
     ],
   },
   {
-    title: "Услуги и блок о школе",
+    title: "Услуги и о школе",
     keys: [
       "services.kicker",
       "services.title",
       "services.lead",
-      "services.duration",
-      "services.hours",
-      "services.book",
       "about.kicker",
       "about.title",
       "about.body",
@@ -310,7 +256,7 @@ const TEXT_GROUPS: { title: string; keys: string[] }[] = [
     ],
   },
   {
-    title: "Шаги, команда и отзывы",
+    title: "Шаги, запись, подвал",
     keys: [
       "steps.kicker",
       "steps.title",
@@ -322,111 +268,88 @@ const TEXT_GROUPS: { title: string; keys: string[] }[] = [
       "steps.3.body",
       "steps.4.title",
       "steps.4.body",
-      "team.kicker",
-      "team.title",
-      "reviews.kicker",
-      "reviews.title",
-    ],
-  },
-  {
-    title: "Запись, контакты и подвал",
-    keys: [
       "booking.kicker",
       "booking.title",
       "booking.lead",
-      "booking.name",
-      "booking.phone",
-      "booking.category",
-      "booking.date",
-      "booking.comment",
       "booking.submit",
-      "booking.whatsapp",
-      "booking.telegram",
       "booking.success",
-      "booking.error",
-      "booking.name.ph",
-      "booking.phone.ph",
-      "booking.comment.ph",
       "contacts.kicker",
       "contacts.title",
-      "contacts.phone",
-      "contacts.address",
-      "contacts.hours",
-      "contacts.map",
       "footer.rights",
-      "footer.admin",
-      "wa.prefill",
     ],
   },
 ];
 
 function TextsEditor({
   payload,
-  onSave,
+  token,
+  onSaved,
 }: {
   payload: SitePayload;
-  onSave: (texts: SitePayload["texts"]) => void;
+  token: string;
+  onSaved: () => void;
 }) {
   const [draft, setDraft] = useState(payload.texts);
+  const [pending, setPending] = useState(false);
+
+  const items = useMemo(
+    () => Object.entries(draft).map(([key, v]) => ({ key, ru: v.ru, kz: v.kz })),
+    [draft],
+  );
+
+  async function save() {
+    setPending(true);
+    try {
+      await saveTextsFn({ data: { token, items } });
+      saveLocalContent({ ...contentFromPayload(payload), texts: draft });
+      toast.success("Тексты сохранены — сайт обновится сразу");
+      onSaved();
+    } catch {
+      toast.error("Не удалось сохранить");
+    } finally {
+      setPending(false);
+    }
+  }
 
   return (
     <div>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="font-display text-2xl">Тексты RU / KZ</h1>
-          <p className="mt-1 text-sm text-muted">
-            Здесь можно менять заголовки, кнопки, описания и подписи.
-          </p>
-        </div>
-
-        <Button onClick={() => onSave(draft)}>Сохранить</Button>
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="font-display text-2xl">Тексты RU / KZ</h1>
+        <Button onClick={() => void save()} disabled={pending}>
+          Сохранить
+        </Button>
       </div>
-
       <div className="mt-8 space-y-10">
         {TEXT_GROUPS.map((group) => (
           <section key={group.title}>
-            <h2 className="text-sm uppercase tracking-[0.16em] text-muted">
-              {group.title}
-            </h2>
-
+            <h2 className="text-sm uppercase tracking-[0.16em] text-muted">{group.title}</h2>
             <div className="mt-4 space-y-4">
               {group.keys.map((key) => (
-                <div
-                  key={key}
-                  className="rounded-lg border border-border bg-surface p-4"
-                >
+                <div key={key} className="rounded-lg border border-border bg-surface p-4">
                   <p className="mb-3 font-mono text-xs text-subtle">{key}</p>
-
                   <div className="grid gap-3 md:grid-cols-2">
                     <label className="grid gap-1.5">
                       <Label>RU</Label>
                       <Textarea
                         rows={2}
                         value={draft[key]?.ru ?? ""}
-                        onChange={(event) =>
-                          setDraft((current) => ({
-                            ...current,
-                            [key]: {
-                              ru: event.target.value,
-                              kz: current[key]?.kz ?? "",
-                            },
+                        onChange={(e) =>
+                          setDraft((d) => ({
+                            ...d,
+                            [key]: { ru: e.target.value, kz: d[key]?.kz ?? "" },
                           }))
                         }
                       />
                     </label>
-
                     <label className="grid gap-1.5">
                       <Label>KZ</Label>
                       <Textarea
                         rows={2}
                         value={draft[key]?.kz ?? ""}
-                        onChange={(event) =>
-                          setDraft((current) => ({
-                            ...current,
-                            [key]: {
-                              ru: current[key]?.ru ?? "",
-                              kz: event.target.value,
-                            },
+                        onChange={(e) =>
+                          setDraft((d) => ({
+                            ...d,
+                            [key]: { ru: d[key]?.ru ?? "", kz: e.target.value },
                           }))
                         }
                       />
@@ -444,216 +367,181 @@ function TextsEditor({
 
 function ServicesEditor({
   payload,
-  onSave,
+  token,
+  onSaved,
 }: {
   payload: SitePayload;
-  onSave: (services: Service[]) => void;
+  token: string;
+  onSaved: () => void;
 }) {
-  const [rows, setRows] = useState<Service[]>(payload.services);
+  const [rows, setRows] = useState(payload.services);
 
-  function patch(id: number, value: Partial<Service>) {
-    setRows((current) =>
-      current.map((item) =>
-        item.id === id
-          ? {
-              ...item,
-              ...value,
-            }
-          : item,
-      ),
-    );
+  function patch(id: number, next: Partial<Service>) {
+    setRows((list) => list.map((s) => (s.id === id ? { ...s, ...next } : s)));
   }
 
-  function addService() {
-    const nextId = Math.max(0, ...rows.map((item) => item.id)) + 1;
-
-    setRows((current) => [
-      ...current,
-      {
-        id: nextId,
-        code: "NEW",
-        titleRu: "Новая категория",
-        titleKz: "Жаңа санат",
-        descRu: "",
-        descKz: "",
-        price: 0,
-        durationRu: "",
-        durationKz: "",
-        hours: 10,
-        featured: false,
-        sortOrder: Math.max(0, ...current.map((item) => item.sortOrder)) + 10,
-      },
-    ]);
-  }
-
-  function removeService(id: number) {
-    setRows((current) => current.filter((item) => item.id !== id));
-  }
-
-  function save() {
-    if (rows.some((item) => !item.code.trim() || !item.titleRu.trim())) {
-      toast.error("Заполните код и название RU у всех категорий.");
-      return;
+  async function saveOne(s: Service) {
+    try {
+      await saveServiceFn({
+        data: {
+          token,
+          service: {
+            id: s.id,
+            code: s.code,
+            titleRu: s.titleRu,
+            titleKz: s.titleKz,
+            descRu: s.descRu,
+            descKz: s.descKz,
+            price: Number(s.price),
+            durationRu: s.durationRu,
+            durationKz: s.durationKz,
+            hours: s.hours,
+            featured: s.featured,
+            sortOrder: s.sortOrder,
+          },
+        },
+      });
+      saveLocalContent({
+        ...contentFromPayload(payload),
+        services: rows.map((row) => (row.id === s.id ? s : row)),
+      });
+      toast.success(`Категория ${s.code} сохранена`);
+      onSaved();
+    } catch {
+      toast.error("Ошибка сохранения");
     }
-
-    onSave(
-      [...rows].sort(
-        (first, second) => first.sortOrder - second.sortOrder,
-      ),
-    );
   }
 
-  const sortedRows = [...rows].sort(
-    (first, second) => first.sortOrder - second.sortOrder,
-  );
+  async function addNew() {
+    try {
+      const created = await saveServiceFn({
+        data: {
+          token,
+          service: {
+            code: "D",
+            titleRu: "Новая категория",
+            titleKz: "Жаңа санат",
+            descRu: "",
+            descKz: "",
+            price: 0,
+            durationRu: "",
+            durationKz: "",
+            hours: 10,
+            featured: false,
+            sortOrder: 90,
+          },
+        },
+      });
+      saveLocalContent({
+        ...contentFromPayload(payload),
+        services: [...rows, created],
+      });
+      toast.success("Категория добавлена");
+      onSaved();
+    } catch {
+      toast.error("Не удалось добавить");
+    }
+  }
+
+  async function remove(id: number) {
+    try {
+      await removeServiceFn({ data: { token, id } });
+      saveLocalContent({
+        ...contentFromPayload(payload),
+        services: rows.filter((s) => s.id !== id),
+      });
+      toast.success("Удалено");
+      onSaved();
+    } catch {
+      toast.error("Не удалось удалить");
+    }
+  }
+  }
 
   return (
     <div>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="font-display text-2xl">Цены и категории</h1>
-          <p className="mt-1 text-sm text-muted">
-            Каждую карточку можно изменить или удалить.
-          </p>
-        </div>
-
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={addService}>
-            Добавить
-          </Button>
-          <Button onClick={save}>Сохранить все</Button>
-        </div>
+      <div className="flex items-center justify-between">
+        <h1 className="font-display text-2xl">Цены и категории</h1>
+        <Button onClick={() => void addNew()}>Добавить</Button>
       </div>
-
       <div className="mt-6 space-y-4">
-        {sortedRows.map((service) => (
-          <div
-            key={service.id}
-            className="rounded-xl border border-border bg-surface p-4"
-          >
+        {rows.map((s) => (
+          <div key={s.id} className="rounded-xl border border-border bg-surface p-4">
             <div className="grid gap-3 sm:grid-cols-4">
               <Field label="Код">
-                <Input
-                  value={service.code}
-                  onChange={(event) =>
-                    patch(service.id, { code: event.target.value })
-                  }
-                />
+                <Input value={s.code} onChange={(e) => patch(s.id, { code: e.target.value })} />
               </Field>
-
               <Field label="Цена, ₸">
                 <Input
                   type="number"
-                  value={service.price}
-                  onChange={(event) =>
-                    patch(service.id, {
-                      price: Number(event.target.value || 0),
-                    })
-                  }
+                  value={s.price}
+                  onChange={(e) => patch(s.id, { price: Number(e.target.value) })}
                 />
               </Field>
-
               <Field label="Часы">
                 <Input
                   type="number"
-                  value={service.hours ?? 0}
-                  onChange={(event) =>
-                    patch(service.id, {
-                      hours: Number(event.target.value || 0),
-                    })
-                  }
+                  value={s.hours ?? 0}
+                  onChange={(e) => patch(s.id, { hours: Number(e.target.value) })}
                 />
               </Field>
-
               <Field label="Порядок">
                 <Input
                   type="number"
-                  value={service.sortOrder}
-                  onChange={(event) =>
-                    patch(service.id, {
-                      sortOrder: Number(event.target.value || 0),
-                    })
-                  }
+                  value={s.sortOrder}
+                  onChange={(e) => patch(s.id, { sortOrder: Number(e.target.value) })}
                 />
               </Field>
-
               <Field label="Название RU">
-                <Input
-                  value={service.titleRu}
-                  onChange={(event) =>
-                    patch(service.id, { titleRu: event.target.value })
-                  }
-                />
+                <Input value={s.titleRu} onChange={(e) => patch(s.id, { titleRu: e.target.value })} />
               </Field>
-
               <Field label="Название KZ">
-                <Input
-                  value={service.titleKz}
-                  onChange={(event) =>
-                    patch(service.id, { titleKz: event.target.value })
-                  }
-                />
+                <Input value={s.titleKz} onChange={(e) => patch(s.id, { titleKz: e.target.value })} />
               </Field>
-
               <Field label="Срок RU">
                 <Input
-                  value={service.durationRu}
-                  onChange={(event) =>
-                    patch(service.id, { durationRu: event.target.value })
-                  }
+                  value={s.durationRu}
+                  onChange={(e) => patch(s.id, { durationRu: e.target.value })}
                 />
               </Field>
-
               <Field label="Срок KZ">
                 <Input
-                  value={service.durationKz}
-                  onChange={(event) =>
-                    patch(service.id, { durationKz: event.target.value })
-                  }
+                  value={s.durationKz}
+                  onChange={(e) => patch(s.id, { durationKz: e.target.value })}
                 />
               </Field>
             </div>
-
             <div className="mt-3 grid gap-3 md:grid-cols-2">
               <Field label="Описание RU">
                 <Textarea
                   rows={2}
-                  value={service.descRu}
-                  onChange={(event) =>
-                    patch(service.id, { descRu: event.target.value })
-                  }
+                  value={s.descRu}
+                  onChange={(e) => patch(s.id, { descRu: e.target.value })}
                 />
               </Field>
-
               <Field label="Описание KZ">
                 <Textarea
                   rows={2}
-                  value={service.descKz}
-                  onChange={(event) =>
-                    patch(service.id, { descKz: event.target.value })
-                  }
+                  value={s.descKz}
+                  onChange={(e) => patch(s.id, { descKz: e.target.value })}
                 />
               </Field>
             </div>
-
             <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
               <label className="flex h-11 items-center gap-2 text-sm">
                 <input
                   type="checkbox"
-                  checked={service.featured}
-                  onChange={(event) =>
-                    patch(service.id, { featured: event.target.checked })
-                  }
+                  checked={s.featured}
+                  onChange={(e) => patch(s.id, { featured: e.target.checked })}
                 />
                 Популярный пакет
               </label>
-
-              <Button
-                variant="outline"
-                onClick={() => removeService(service.id)}
-              >
-                Удалить
-              </Button>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => void remove(s.id)}>
+                  Удалить
+                </Button>
+                <Button onClick={() => void saveOne(s)}>Сохранить</Button>
+              </div>
             </div>
           </div>
         ))}
@@ -664,125 +552,74 @@ function ServicesEditor({
 
 function ContactsEditor({
   payload,
-  onSave,
+  token,
+  onSaved,
 }: {
   payload: SitePayload;
-  onSave: (contacts: ContactInfo) => void;
+  token: string;
+  onSaved: () => void;
 }) {
-  const [contacts, setContacts] = useState<ContactInfo>(payload.contacts);
+  const [c, setC] = useState<ContactInfo>(payload.contacts);
+  const [pending, setPending] = useState(false);
 
-  function save() {
-    onSave({
-      ...contacts,
-      enrolledBase: Number(contacts.enrolledBase || 0),
-    });
+  async function save() {
+    setPending(true);
+    try {
+      await saveContactsFn({ data: { token, contacts: { ...c, enrolledBase: Number(c.enrolledBase) } } });
+      saveLocalContent({ ...contentFromPayload(payload), contacts: { ...c, enrolledBase: Number(c.enrolledBase) } });
+      toast.success("Контакты обновлены");
+      onSaved();
+    } catch {
+      toast.error("Ошибка");
+    } finally {
+      setPending(false);
+    }
   }
 
   return (
     <div>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="font-display text-2xl">Контакты</h1>
-          <p className="mt-1 text-sm text-muted">
-            Телефоны, мессенджеры, адрес и режим работы.
-          </p>
-        </div>
-
-        <Button onClick={save}>Сохранить</Button>
+      <div className="flex items-center justify-between">
+        <h1 className="font-display text-2xl">Контакты</h1>
+        <Button onClick={() => void save()} disabled={pending}>
+          Сохранить
+        </Button>
       </div>
-
       <div className="mt-6 grid gap-3 sm:grid-cols-2">
         <Field label="Телефон">
-          <Input
-            value={contacts.phone}
-            onChange={(event) =>
-              setContacts({ ...contacts, phone: event.target.value })
-            }
-          />
+          <Input value={c.phone} onChange={(e) => setC({ ...c, phone: e.target.value })} />
         </Field>
-
         <Field label="WhatsApp">
-          <Input
-            value={contacts.whatsapp}
-            onChange={(event) =>
-              setContacts({ ...contacts, whatsapp: event.target.value })
-            }
-          />
+          <Input value={c.whatsapp} onChange={(e) => setC({ ...c, whatsapp: e.target.value })} />
         </Field>
-
         <Field label="Telegram (@username)">
-          <Input
-            value={contacts.telegram}
-            onChange={(event) =>
-              setContacts({ ...contacts, telegram: event.target.value })
-            }
-          />
+          <Input value={c.telegram} onChange={(e) => setC({ ...c, telegram: e.target.value })} />
         </Field>
-
         <Field label="Instagram">
-          <Input
-            value={contacts.instagram}
-            onChange={(event) =>
-              setContacts({ ...contacts, instagram: event.target.value })
-            }
-          />
+          <Input value={c.instagram} onChange={(e) => setC({ ...c, instagram: e.target.value })} />
         </Field>
-
         <Field label="Адрес RU">
-          <Input
-            value={contacts.addressRu}
-            onChange={(event) =>
-              setContacts({ ...contacts, addressRu: event.target.value })
-            }
-          />
+          <Input value={c.addressRu} onChange={(e) => setC({ ...c, addressRu: e.target.value })} />
         </Field>
-
         <Field label="Адрес KZ">
-          <Input
-            value={contacts.addressKz}
-            onChange={(event) =>
-              setContacts({ ...contacts, addressKz: event.target.value })
-            }
-          />
+          <Input value={c.addressKz} onChange={(e) => setC({ ...c, addressKz: e.target.value })} />
         </Field>
-
         <Field label="Часы RU">
-          <Input
-            value={contacts.hoursRu}
-            onChange={(event) =>
-              setContacts({ ...contacts, hoursRu: event.target.value })
-            }
-          />
+          <Input value={c.hoursRu} onChange={(e) => setC({ ...c, hoursRu: e.target.value })} />
         </Field>
-
         <Field label="Часы KZ">
-          <Input
-            value={contacts.hoursKz}
-            onChange={(event) =>
-              setContacts({ ...contacts, hoursKz: event.target.value })
-            }
-          />
+          <Input value={c.hoursKz} onChange={(e) => setC({ ...c, hoursKz: e.target.value })} />
         </Field>
-
-        <Field label="Адрес ссылки на карту">
-          <Input
-            value={contacts.mapUrl}
-            onChange={(event) =>
-              setContacts({ ...contacts, mapUrl: event.target.value })
-            }
-          />
+        <Field label="Широта">
+          <Input value={c.lat} onChange={(e) => setC({ ...c, lat: e.target.value })} />
         </Field>
-
-        <Field label="Базовое число учеников">
+        <Field label="Долгота">
+          <Input value={c.lng} onChange={(e) => setC({ ...c, lng: e.target.value })} />
+        </Field>
+        <Field label="База учеников (счётчик)">
           <Input
             type="number"
-            value={contacts.enrolledBase}
-            onChange={(event) =>
-              setContacts({
-                ...contacts,
-                enrolledBase: Number(event.target.value || 0),
-              })
-            }
+            value={c.enrolledBase}
+            onChange={(e) => setC({ ...c, enrolledBase: Number(e.target.value) })}
           />
         </Field>
       </div>
@@ -790,59 +627,338 @@ function ContactsEditor({
   );
 }
 
-function ToolsPanel({
-  onChanged,
-  onReset,
+function TeamEditor({
+  payload,
+  token,
+  onSaved,
 }: {
-  onChanged: () => void;
-  onReset: () => void;
+  payload: SitePayload;
+  token: string;
+  onSaved: () => void;
 }) {
-  const [jsonText, setJsonText] = useState("");
+  const [instructors, setInstructors] = useState<Instructor[]>(payload.instructors);
+  const [reviews, setReviews] = useState<Review[]>(payload.reviews);
 
-  function exportJson() {
-    setJsonText(JSON.stringify(exportSiteData(), null, 2));
-    toast.success("Данные экспортированы в JSON.");
+  return (
+    <div className="space-y-10">
+      <section>
+        <div className="flex items-center justify-between">
+          <h1 className="font-display text-2xl">Инструкторы</h1>
+          <Button
+            onClick={async () => {
+              try {
+                await saveInstructorsFn({ data: { token, items: instructors } });
+                saveLocalContent({ ...contentFromPayload(payload), instructors });
+                toast.success("Сохранено");
+                onSaved();
+              } catch {
+                toast.error("Ошибка");
+              }
+            }}
+          >
+            Сохранить
+          </Button>
+        </div>
+        <div className="mt-4 space-y-3">
+          {instructors.map((p, idx) => (
+            <div key={p.id} className="grid gap-3 rounded-lg border border-border bg-surface p-4 sm:grid-cols-5">
+              <Field label="Инициалы">
+                <Input
+                  value={p.initials}
+                  onChange={(e) =>
+                    setInstructors((list) =>
+                      list.map((x, i) => (i === idx ? { ...x, initials: e.target.value } : x)),
+                    )
+                  }
+                />
+              </Field>
+              <Field label="Имя RU">
+                <Input
+                  value={p.nameRu}
+                  onChange={(e) =>
+                    setInstructors((list) =>
+                      list.map((x, i) => (i === idx ? { ...x, nameRu: e.target.value } : x)),
+                    )
+                  }
+                />
+              </Field>
+              <Field label="Имя KZ">
+                <Input
+                  value={p.nameKz}
+                  onChange={(e) =>
+                    setInstructors((list) =>
+                      list.map((x, i) => (i === idx ? { ...x, nameKz: e.target.value } : x)),
+                    )
+                  }
+                />
+              </Field>
+              <Field label="Роль RU" className="sm:col-span-2">
+                <Input
+                  value={p.roleRu}
+                  onChange={(e) =>
+                    setInstructors((list) =>
+                      list.map((x, i) => (i === idx ? { ...x, roleRu: e.target.value } : x)),
+                    )
+                  }
+                />
+              </Field>
+              <Field label="Роль KZ" className="sm:col-span-5">
+                <Input
+                  value={p.roleKz}
+                  onChange={(e) =>
+                    setInstructors((list) =>
+                      list.map((x, i) => (i === idx ? { ...x, roleKz: e.target.value } : x)),
+                    )
+                  }
+                />
+              </Field>
+            </div>
+          ))}
+        </div>
+      </section>
+      <section>
+        <div className="flex items-center justify-between">
+          <h2 className="font-display text-2xl">Отзывы</h2>
+          <Button
+            onClick={async () => {
+              try {
+                await saveReviewsFn({ data: { token, items: reviews } });
+                saveLocalContent({ ...contentFromPayload(payload), reviews });
+                toast.success("Отзывы сохранены");
+                onSaved();
+              } catch {
+                toast.error("Ошибка");
+              }
+            }}
+          >
+            Сохранить
+          </Button>
+        </div>
+        <div className="mt-4 space-y-3">
+          {reviews.map((r, idx) => (
+            <div key={r.id} className="grid gap-3 rounded-lg border border-border bg-surface p-4 md:grid-cols-2">
+              <Field label="Имя RU">
+                <Input
+                  value={r.nameRu}
+                  onChange={(e) =>
+                    setReviews((list) =>
+                      list.map((x, i) => (i === idx ? { ...x, nameRu: e.target.value } : x)),
+                    )
+                  }
+                />
+              </Field>
+              <Field label="Имя KZ">
+                <Input
+                  value={r.nameKz}
+                  onChange={(e) =>
+                    setReviews((list) =>
+                      list.map((x, i) => (i === idx ? { ...x, nameKz: e.target.value } : x)),
+                    )
+                  }
+                />
+              </Field>
+              <Field label="Текст RU">
+                <Textarea
+                  rows={3}
+                  value={r.bodyRu}
+                  onChange={(e) =>
+                    setReviews((list) =>
+                      list.map((x, i) => (i === idx ? { ...x, bodyRu: e.target.value } : x)),
+                    )
+                  }
+                />
+              </Field>
+              <Field label="Текст KZ">
+                <Textarea
+                  rows={3}
+                  value={r.bodyKz}
+                  onChange={(e) =>
+                    setReviews((list) =>
+                      list.map((x, i) => (i === idx ? { ...x, bodyKz: e.target.value } : x)),
+                    )
+                  }
+                />
+              </Field>
+            </div>
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function BookingsList({
+  token,
+  items,
+  onChanged,
+}: {
+  token: string;
+  items: { id: number; name: string; phone: string; category: string; preferredDate: string; comment: string; createdAt: string }[];
+  onChanged: () => void;
+}) {
+  if (!items.length) {
+    return <p className="text-muted">Заявок пока нет. Они появятся после формы на сайте.</p>;
+  }
+  return (
+    <div className="space-y-3">
+      <h1 className="font-display text-2xl">Заявки</h1>
+      {items.map((b) => (
+        <article key={b.id} className="rounded-xl border border-border bg-surface p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="font-medium">{b.name}</p>
+              <a href={`tel:${b.phone}`} className="text-sm text-muted hover:text-fg">
+                {b.phone}
+              </a>
+            </div>
+            <p className="font-display text-sm">{b.category}</p>
+          </div>
+          <p className="mt-2 text-sm text-muted">
+            {b.preferredDate ? `Дата: ${b.preferredDate}` : "Дата не указана"}
+            {b.comment ? ` · ${b.comment}` : ""}
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button asChild size="sm" variant="secondary">
+              <a href={waLink(b.phone, `Здравствуйте, ${b.name}! Авто-Эмир.`)} target="_blank" rel="noreferrer">
+                WhatsApp
+              </a>
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={async () => {
+                await removeBookingFn({ data: { token, id: b.id } });
+                onChanged();
+              }}
+            >
+              Убрать
+            </Button>
+          </div>
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function JsonBackup({
+  payload,
+  token,
+  onApplied,
+}: {
+  payload: SitePayload;
+  token: string;
+  onApplied: () => void;
+}) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [draft, setDraft] = useState(() => toPrettyJson(contentFromPayload(payload)));
+  const [pending, setPending] = useState(false);
+
+  function applyLocal(raw: string) {
+    const parsed = parseSiteContent(JSON.parse(raw) as unknown);
+    saveLocalContent(parsed);
+    setDraft(toPrettyJson(parsed));
+    onApplied();
+    return parsed;
   }
 
-  function importJson() {
+  async function publish() {
+    setPending(true);
     try {
-      importSiteData(JSON.parse(jsonText));
-      onChanged();
-      toast.success("Данные успешно импортированы!");
-    } catch {
-      toast.error("Ошибка в формате JSON. Проверьте синтаксис.");
+      const parsed = applyLocal(draft);
+      await publishSiteFn({ data: { token, content: parsed } });
+      toast.success("Опубликовано. На живом сайте цены обновятся после выкладки.");
+    } catch (err) {
+      if (err instanceof SyntaxError) {
+        toast.error("JSON с ошибкой. Проверьте запятые и кавычки.");
+      } else {
+        toast.error(mapGithubError(err));
+      }
+    } finally {
+      setPending(false);
     }
   }
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="font-display text-2xl">Резервная копия и JSON</h1>
-        <p className="mt-1 text-sm text-muted">
-          Вы можете выгрузить все данные сайта или загрузить их обратно.
-        </p>
-      </div>
-
-      <div className="flex flex-wrap gap-3">
-        <Button onClick={exportJson}>Экспортировать JSON</Button>
-        <Button variant="outline" onClick={importJson}>
-          Импортировать из поля ниже
-        </Button>
-        <Button variant="outline" onClick={onReset}>
-          Сбросить всё к дефолту
+    <div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="font-display text-2xl">JSON / Резервная копия</h1>
+          <p className="mt-2 max-w-xl text-sm text-muted">
+            Цены, тексты и контакты живут в файле app-data.json. Кнопка публикации
+            записывает этот JSON в репозиторий GitHub — после выкладки сайт берёт
+            новые данные оттуда.
+          </p>
+        </div>
+        <Button onClick={() => void publish()} disabled={pending} className="shrink-0">
+          <CloudUpload className="size-4" />
+          Сохранить и опубликовать на сайт
         </Button>
       </div>
 
-      <label className="grid gap-1.5">
-        <Label>Содержимое JSON</Label>
-        <Textarea
-          rows={12}
-          value={jsonText}
-          onChange={(event) => setJsonText(event.target.value)}
-          placeholder="Нажмите «Экспортировать JSON», чтобы увидеть данные..."
-          className="font-mono text-xs"
+      <div className="mt-6 flex flex-wrap gap-2">
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={() => {
+            try {
+              applyLocal(draft);
+              toast.success("Применено на этом устройстве");
+            } catch {
+              toast.error("JSON с ошибкой");
+            }
+          }}
+        >
+          Применить здесь
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => {
+            const blob = new Blob([draft], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "app-data.json";
+            a.click();
+            URL.revokeObjectURL(url);
+          }}
+        >
+          <Download className="size-4" />
+          Скачать JSON
+        </Button>
+        <Button type="button" variant="outline" onClick={() => fileRef.current?.click()}>
+          <Upload className="size-4" />
+          Загрузить JSON
+        </Button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="application/json,.json"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (!file) return;
+            void file.text().then((text) => {
+              setDraft(text);
+              try {
+                applyLocal(text);
+                toast.success("Файл загружен и применён");
+              } catch {
+                toast.error("Файл не похож на app-data.json");
+              }
+            });
+            e.target.value = "";
+          }}
         />
-      </label>
+      </div>
+
+      <Textarea
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        rows={22}
+        className="mt-5 font-mono text-xs leading-relaxed"
+        spellCheck={false}
+      />
     </div>
   );
 }
@@ -850,12 +966,14 @@ function ToolsPanel({
 function Field({
   label,
   children,
+  className,
 }: {
   label: string;
   children: ReactNode;
+  className?: string;
 }) {
   return (
-    <label className="grid gap-1.5">
+    <label className={cn("grid gap-1.5", className)}>
       <Label>{label}</Label>
       {children}
     </label>

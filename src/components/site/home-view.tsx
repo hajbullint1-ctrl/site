@@ -1,6 +1,5 @@
 import { Clock3, GraduationCap, MapPin, Phone, Shield, Timer } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { SiteHeader } from "@/components/site/header";
 import { WhatsAppIcon } from "@/components/site/icons";
 import { useLang } from "@/components/site/lang";
@@ -11,23 +10,26 @@ import {
   useVisitTimer,
 } from "@/components/site/live-stats";
 import { BookingForm } from "@/components/site/booking-form";
+import { ServicesSection } from "@/components/site/services";
 import { field, t } from "@/lib/i18n";
-import { formatTenge, telLink, waLink } from "@/lib/utils";
+import { useSiteContent } from "@/lib/site-content";
+import { telLink, waLink } from "@/lib/utils";
 import type { SitePayload } from "@/lib/site-types";
 
 export function HomeView({ payload }: { payload: SitePayload }) {
   const { lang } = useLang();
-  const texts = payload.texts;
+  const live = useSiteContent(payload);
+  const texts = live.texts;
   const online = useOnlineCount();
-  const enrolled = useEnrolledCount(payload.contacts.enrolledBase, payload.bookingCount);
+  const enrolled = useEnrolledCount(live.contacts.enrolledBase, live.bookingCount);
   const timer = useVisitTimer();
-  const phone = payload.contacts.phone;
-  const wa = payload.contacts.whatsapp || phone;
+  const phone = live.contacts.phone;
+  const wa = live.contacts.whatsapp || phone;
   const prefill = t(texts, "wa.prefill", lang);
 
   return (
     <div id="top" className="min-h-dvh bg-bg text-fg">
-      <SiteHeader payload={payload} />
+      <SiteHeader payload={live} />
 
       <div className="border-b border-border bg-surface/80">
         <div className="mx-auto flex max-w-6xl items-center gap-6 overflow-x-auto px-4 py-3 sm:px-6">
@@ -75,10 +77,10 @@ export function HomeView({ payload }: { payload: SitePayload }) {
               </Button>
             </div>
             <dl className="mt-10 grid grid-cols-2 gap-4 sm:grid-cols-4">
-              <Trust value="5.0" label={t(texts, "trust.rating", lang)} />
-              <Trust value="A B C" label={t(texts, "trust.categories", lang)} />
-              <Trust value="2" label={t(texts, "trust.languages", lang)} />
-              <Trust value="У" label={t(texts, "trust.autodrome", lang)} />
+              <Trust label="5.0" value={t(texts, "trust.rating", lang)} />
+              <Trust label="A B C" value={t(texts, "trust.categories", lang)} />
+              <Trust label="2" value={t(texts, "trust.languages", lang)} />
+              <Trust label="У" value={t(texts, "trust.autodrome", lang)} />
             </dl>
           </div>
           <div className="relative">
@@ -92,7 +94,7 @@ export function HomeView({ payload }: { payload: SitePayload }) {
             <div className="absolute -bottom-4 left-4 right-4 hidden items-center justify-between rounded-xl border border-border bg-elevated/95 px-4 py-3 sm:flex">
               <div className="flex items-center gap-2 text-sm text-muted">
                 <Timer className="size-4" />
-                {field(payload.contacts, lang, "hoursRu", "hoursKz")}
+                {field(live.contacts, lang, "hoursRu", "hoursKz")}
               </div>
               <div className="flex items-center gap-2 text-sm text-muted">
                 <MapPin className="size-4" />
@@ -103,52 +105,7 @@ export function HomeView({ payload }: { payload: SitePayload }) {
         </div>
       </section>
 
-      <section id="services" className="scroll-mt-20 border-t border-border">
-        <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
-          <SectionHead
-            kicker={t(texts, "services.kicker", lang)}
-            title={t(texts, "services.title", lang)}
-            lead={t(texts, "services.lead", lang)}
-          />
-          <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {payload.services.map((s) => (
-              <article
-                key={s.id}
-                className="flex flex-col rounded-xl border border-border bg-surface p-5"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="font-display text-xs tracking-[0.2em] text-muted">{s.code}</p>
-                    <h3 className="mt-1 text-lg font-medium">{field(s, lang, "titleRu", "titleKz")}</h3>
-                  </div>
-                  {s.featured ? <Badge className="border-primary/30 text-fg">курс</Badge> : null}
-                </div>
-                <p className="mt-3 flex-1 text-sm leading-relaxed text-muted">
-                  {field(s, lang, "descRu", "descKz")}
-                </p>
-                <p className="mt-5 font-display text-xl tabular-nums tracking-tight">
-                  {formatTenge(s.price)}
-                </p>
-                <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
-                  <span>
-                    {t(texts, "services.duration", lang)}: {field(s, lang, "durationRu", "durationKz")}
-                  </span>
-                  {s.hours ? (
-                    <span>
-                      {s.hours} {t(texts, "services.hours", lang)}
-                    </span>
-                  ) : null}
-                </div>
-                <Button asChild variant="secondary" className="mt-5 w-full">
-                  <a href={`#booking`} data-cat={s.code}>
-                    {t(texts, "services.book", lang)}
-                  </a>
-                </Button>
-              </article>
-            ))}
-          </div>
-        </div>
-      </section>
+      <ServicesSection />
 
       <section id="about" className="scroll-mt-20 border-t border-border bg-surface/40">
         <div className="mx-auto grid max-w-6xl gap-10 px-4 py-16 sm:px-6 lg:grid-cols-2">
@@ -216,7 +173,7 @@ export function HomeView({ payload }: { payload: SitePayload }) {
         <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
           <SectionHead kicker={t(texts, "team.kicker", lang)} title={t(texts, "team.title", lang)} />
           <div className="mt-10 grid gap-4 sm:grid-cols-3">
-            {payload.instructors.map((person) => (
+            {live.instructors.map((person) => (
               <article key={person.id} className="rounded-xl border border-border bg-bg p-5">
                 <div className="flex size-12 items-center justify-center rounded-lg border border-border font-display text-sm tracking-wide">
                   {person.initials}
@@ -238,7 +195,7 @@ export function HomeView({ payload }: { payload: SitePayload }) {
             title={t(texts, "reviews.title", lang)}
           />
           <div className="mt-10 grid gap-4 lg:grid-cols-3">
-            {payload.reviews.map((review) => (
+            {live.reviews.map((review) => (
               <blockquote
                 key={review.id}
                 className="rounded-xl border border-border bg-surface p-5"
@@ -270,10 +227,10 @@ export function HomeView({ payload }: { payload: SitePayload }) {
                   {t(texts, "booking.whatsapp", lang)}
                 </a>
               </Button>
-              {payload.contacts.telegram ? (
+              {live.contacts.telegram ? (
                 <Button asChild variant="outline" size="lg">
                   <a
-                    href={`https://t.me/${payload.contacts.telegram.replace(/^@/, "")}`}
+                    href={`https://t.me/${live.contacts.telegram.replace(/^@/, "")}`}
                     target="_blank"
                     rel="noreferrer"
                   >
@@ -283,7 +240,7 @@ export function HomeView({ payload }: { payload: SitePayload }) {
               ) : null}
             </div>
           </div>
-          <BookingForm payload={payload} lang={lang} />
+          <BookingForm payload={live} lang={lang} />
         </div>
       </section>
 
@@ -302,11 +259,11 @@ export function HomeView({ payload }: { payload: SitePayload }) {
               />
               <ContactRow
                 label={t(texts, "contacts.address", lang)}
-                value={field(payload.contacts, lang, "addressRu", "addressKz")}
+                value={field(live.contacts, lang, "addressRu", "addressKz")}
               />
               <ContactRow
                 label={t(texts, "contacts.hours", lang)}
-                value={field(payload.contacts, lang, "hoursRu", "hoursKz")}
+                value={field(live.contacts, lang, "hoursRu", "hoursKz")}
               />
             </dl>
           </div>
@@ -316,7 +273,7 @@ export function HomeView({ payload }: { payload: SitePayload }) {
               className="h-72 w-full grayscale contrast-125 lg:h-full min-h-72"
               loading="lazy"
               referrerPolicy="no-referrer-when-downgrade"
-              src={`https://www.openstreetmap.org/export/embed.html?bbox=${Number(payload.contacts.lng) - 0.01}%2C${Number(payload.contacts.lat) - 0.008}%2C${Number(payload.contacts.lng) + 0.01}%2C${Number(payload.contacts.lat) + 0.008}&layer=mapnik&marker=${payload.contacts.lat}%2C${payload.contacts.lng}`}
+              src={`https://www.openstreetmap.org/export/embed.html?bbox=${Number(live.contacts.lng) - 0.01}%2C${Number(live.contacts.lat) - 0.008}%2C${Number(live.contacts.lng) + 0.01}%2C${Number(live.contacts.lat) + 0.008}&layer=mapnik&marker=${live.contacts.lat}%2C${live.contacts.lng}`}
             />
           </div>
         </div>
@@ -347,8 +304,8 @@ export function HomeView({ payload }: { payload: SitePayload }) {
 function Trust({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="font-display text-lg tracking-tight text-fg">{label}</dt>
-      <dd className="mt-1 text-[11px] leading-snug text-fg">{value}</dd>
+      <dt className="font-display text-lg tracking-tight">{label}</dt>
+      <dd className="mt-1 text-[11px] leading-snug text-muted">{value}</dd>
     </div>
   );
 }
@@ -382,7 +339,7 @@ function ContactRow({
 }) {
   return (
     <div>
-      <dt className="text-xs uppercase tracking-[0.16em] text-fg">{label}</dt>
+      <dt className="text-xs uppercase tracking-[0.16em] text-muted">{label}</dt>
       <dd className="mt-1 text-base">
         {href ? (
           <a href={href} className="hover:underline">

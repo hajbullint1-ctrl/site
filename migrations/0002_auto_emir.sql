@@ -63,26 +63,10 @@ create table if not exists reviews (
   rating integer not null default 5,
   sort_order integer not null default 0
 );
--- Таблица авторизации админа
-CREATE TABLE IF NOT EXISTS admin_auth (
-  id INT PRIMARY KEY DEFAULT 1,
-  password_hash TEXT NOT NULL
+
+create table if not exists admin_auth (
+  id integer primary key default 1,
+  password_hash text not null,
+  token text,
+  token_expires timestamptz
 );
-
-DELETE FROM admin_auth WHERE id = 1;
-INSERT INTO admin_auth (id, password_hash) VALUES (1, 'student2026');
-
--- Таблица категорий и цен
-CREATE TABLE IF NOT EXISTS categories (
-  id SERIAL PRIMARY KEY,
-  name TEXT NOT NULL,
-  price TEXT NOT NULL,
-  description TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
-INSERT INTO categories (name, price, description)
-VALUES 
-  ('Категория B', '45 000-50 000 ₸', 'Полный курс обучения вождению'),
-  ('Категория C', '55 000-60 000 ₸', 'Грузовые автомобили')
-ON CONFLICT DO NOTHING;

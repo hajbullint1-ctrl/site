@@ -6,9 +6,11 @@ import type {
   Instructor,
   Review,
   Service,
+  SiteContent,
   SitePayload,
 } from "@/lib/site-types";
 import { TEXTS, SERVICES, INSTRUCTORS, REVIEWS, CONTACTS } from "@/lib/seed-data";
+import { siteContent } from "@/lib/site-content";
 
 const ADMIN_HASH =
   "a3bff63d72c4c15ea3b386b58ae2a42fdf31915dbb9e0fcecabca62e7b9d774c";
@@ -85,102 +87,9 @@ function mapService(row: {
 export async function loadSite(): Promise<SitePayload> {
   const sql = await getSql();
   await ensureSeeded(sql);
-
-  const textRows = await sql<{ key: string; ru: string; kz: string }>`
-    select key, ru, kz from site_texts`;
-  const texts: SitePayload["texts"] = {};
-  for (const row of textRows) texts[row.key] = { ru: row.ru, kz: row.kz };
-
-  const serviceRows = await sql<{
-    id: number;
-    code: string;
-    title_ru: string;
-    title_kz: string;
-    desc_ru: string;
-    desc_kz: string;
-    price: number;
-    duration_ru: string;
-    duration_kz: string;
-    hours: number | null;
-    featured: boolean;
-    sort_order: number;
-  }>`select id, code, title_ru, title_kz, desc_ru, desc_kz, price, duration_ru, duration_kz, hours, featured, sort_order from services order by sort_order, id`;
-
-  const contactRows = await sql<{
-    phone: string;
-    whatsapp: string;
-    telegram: string;
-    address_ru: string;
-    address_kz: string;
-    hours_ru: string;
-    hours_kz: string;
-    instagram: string;
-    lat: string;
-    lng: string;
-    enrolled_base: number;
-  }>`select phone, whatsapp, telegram, address_ru, address_kz, hours_ru, hours_kz, instagram, lat, lng, enrolled_base from contacts where id = 1`;
-
-  const instructorRows = await sql<{
-    id: number;
-    initials: string;
-    name_ru: string;
-    name_kz: string;
-    role_ru: string;
-    role_kz: string;
-    sort_order: number;
-  }>`select id, initials, name_ru, name_kz, role_ru, role_kz, sort_order from instructors order by sort_order, id`;
-
-  const reviewRows = await sql<{
-    id: number;
-    name_ru: string;
-    name_kz: string;
-    body_ru: string;
-    body_kz: string;
-    rating: number;
-    sort_order: number;
-  }>`select id, name_ru, name_kz, body_ru, body_kz, rating, sort_order from reviews order by sort_order, id`;
-
   const countRows = await sql<{ n: number }>`select count(*)::int as n from bookings`;
-
-  const c = contactRows[0];
-  const contacts: ContactInfo = c
-    ? {
-        phone: c.phone,
-        whatsapp: c.whatsapp,
-        telegram: c.telegram,
-        addressRu: c.address_ru,
-        addressKz: c.address_kz,
-        hoursRu: c.hours_ru,
-        hoursKz: c.hours_kz,
-        instagram: c.instagram,
-        lat: c.lat,
-        lng: c.lng,
-        enrolledBase: Number(c.enrolled_base),
-      }
-    : CONTACTS;
-
   return {
-    texts,
-    services: serviceRows.map(mapService),
-    contacts,
-    instructors: instructorRows.map((i) => ({
-      id: i.id,
-      initials: i.initials,
-      nameRu: i.name_ru,
-      nameKz: i.name_kz,
-      roleRu: i.role_ru,
-      roleKz: i.role_kz,
-      sortOrder: Number(i.sort_order),
-    })),
-    reviews: reviewRows.map((r) => ({
-      id: r.id,
-      nameRu: r.name_ru,
-      nameKz: r.name_kz,
-      bodyRu: r.body_ru,
-      bodyKz: r.body_kz,
-      rating: Number(r.rating),
-      sortOrder: Number(r.sort_order),
-    })),
+    ...siteContent,
     bookingCount: Number(countRows[0]?.n ?? 0),
   };
 }
@@ -380,6 +289,76 @@ export async function saveReviews(token: string, items: Review[]): Promise<void>
       rating = ${r.rating},
       sort_order = ${r.sortOrder}
       where id = ${r.id}`;
+  }
+}
+
+export async function replaceSiteContent(token: string, content: SiteContent): Promise<void> {
+  const sql = await requireAdmin(token);
+
+  for (const [key, value] of Object.entries(content.texts)) {
+    await sql`insert into site_texts (key, ru, kz) values (${key}, ${value.ru}, ${value.kz})
+      on conflict (key) do update set ru = excluded.ru, kz = excluded.kz`;
+  }
+
+  const c = content.contacts;
+  await sql`update contacts set
+    phone = ${c.phone},
+    whatsapp = ${c.whatsapp},
+    telegram = ${c.telegram},
+    address_ru = ${c.addressRu},
+    address_kz = ${c.addressKz},
+    hours_ru = ${c.hoursRu},
+    hours_kz = ${c.hoursKz},
+    instagram = ${c.instagram},
+    lat = ${c.lat},
+    lng = ${c.lng},
+    enrolled_base = ${c.enrolledBase}
+    where id = 1`;
+
+  await sql`delete from services`;
+  for (const s of content.services) {
+    await sql`insert into services (code, title_ru, title_kz, desc_ru, desc_kz, price, duration_ru, duration_kz, hours, featured, sort_order)
+      values (${s.code}, ${s.titleRu}, ${s.titleKz}, ${s.descRu}, ${s.descKz}, ${s.price}, ${s.durationRu}, ${s.durationKz}, ${s.hours}, ${s.featured}, ${s.sortOrder})`;
+  }
+
+  await sql`delete from instructors`;
+  for (const i of content.instructors) {
+    await sql`insert into instructors (initials, name_ru, name_kz, role_ru, role_kz, sort_order)
+      values (${i.initials}, ${i.nameRu}, ${i.nameKz}, ${i.roleRu}, ${i.roleKz}, ${i.sortOrder})`;
+  }
+
+  await sql`delete from reviews`;
+  for (const r of content.reviews) {
+    await sql`insert into reviews (name_ru, name_kz, body_ru, body_kz, rating, sort_order)
+      values (${r.nameRu}, ${r.nameKz}, ${r.bodyRu}, ${r.bodyKz}, ${r.rating}, ${r.sortOrder})`;
+  }
+}
+
+export async function publishSiteContent(token: string, content: SiteContent) {
+  await replaceSiteContent(token, content);
+  const { publishAppDataJson } = await import("./github-publish.server.ts");
+  return publishAppDataJson(content);
+}
+
+export async function publishFromRequest(request: Request): Promise<Response> {
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return Response.json({ ok: false, error: "invalid_json" }, { status: 400 });
+  }
+  const token = typeof body === "object" && body && "token" in body ? String((body as { token: unknown }).token) : "";
+  const content = typeof body === "object" && body && "content" in body ? (body as { content: SiteContent }).content : null;
+  if (!token || !content) {
+    return Response.json({ ok: false, error: "bad_request" }, { status: 400 });
+  }
+  try {
+    const result = await publishSiteContent(token, content);
+    return Response.json({ ok: true, ...result });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "failed";
+    const status = message === "unauthorized" ? 401 : message === "github_not_configured" ? 503 : 502;
+    return Response.json({ ok: false, error: message }, { status });
   }
 }
 
