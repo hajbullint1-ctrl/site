@@ -456,7 +456,6 @@ function ServicesEditor({
       toast.error("Не удалось удалить");
     }
   }
-  }
 
   return (
     <div>
