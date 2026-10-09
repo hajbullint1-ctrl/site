@@ -1,6 +1,4 @@
 {
-  "version": 1,
-  "updatedAt": "2026-10-02T15:29:43.076Z",
   "texts": {
     "meta.title": {
       "ru": "Авто-Эмир — автошкола в Туркестане",
@@ -293,102 +291,74 @@
   },
   "services": [
     {
-      "id": 1,
-      "code": "A1",
-      "titleRu": "Категория A1",
-      "titleKz": "A1 санаты",
-      "descRu": "Лёгкие мотоциклы до 125 см³. Теория + площадка.",
-      "descKz": "125 см³ дейінгі жеңіл мотоцикл. Теория + алаң.",
-      "price": 50000,
-      "durationRu": "3 недели",
-      "durationKz": "3 апта",
-      "hours": 10,
-      "featured": false,
-      "sortOrder": 10
-    },
-    {
-      "id": 2,
-      "code": "A",
-      "titleRu": "Категория A",
-      "titleKz": "A санаты",
-      "descRu": "Мотоциклы. Посадка, баланс, городской поток.",
-      "descKz": "Мотоцикл. Отырыс, тепе-теңдік, қала ағыны.",
-      "price": 65000,
-      "durationRu": "1 месяц",
-      "durationKz": "1 ай",
-      "hours": 12,
-      "featured": false,
-      "sortOrder": 20
-    },
-    {
-      "id": 3,
       "code": "B",
       "titleRu": "Категория B",
       "titleKz": "B санаты",
       "descRu": "Легковые авто. Полный курс: ПДД, автодром, город.",
       "descKz": "Жеңіл авто. Толық курс: ЖҚЕ, автодром, қала.",
-      "price": 110000,
+      "price": 49990,
       "durationRu": "2,5 месяца",
       "durationKz": "2,5 ай",
-      "hours": 20,
+      "hours": 8,
       "featured": true,
-      "sortOrder": 30
+      "sortOrder": 8,
+      "id": 3
     },
     {
-      "id": 4,
-      "code": "B1",
+      "code": "BC1",
       "titleRu": "Категория B1",
       "titleKz": "B1 санаты",
       "descRu": "Трициклы и квадрициклы. Компактная программа.",
       "descKz": "Трицикл мен квадрицикл. Шағын бағдарлама.",
-      "price": 85000,
-      "durationRu": "2 месяца",
-      "durationKz": "2 ай",
+      "price": 54990,
+      "durationRu": "2,5-5 месяца",
+      "durationKz": "2,5-5 ай",
       "hours": 14,
-      "featured": false,
-      "sortOrder": 40
+      "featured": true,
+      "sortOrder": 40,
+      "id": 4
     },
     {
-      "id": 5,
-      "code": "BE",
+      "code": "E",
       "titleRu": "Категория BE",
       "titleKz": "BE санаты",
       "descRu": "Легковой автомобиль с прицепом. Для тех, у кого уже есть B.",
       "descKz": "Тіркемелі жеңіл авто. B санаты барларға.",
-      "price": 60000,
+      "price": 54990,
       "durationRu": "3 недели",
       "durationKz": "3 апта",
       "hours": 10,
       "featured": false,
-      "sortOrder": 50
+      "sortOrder": 50,
+      "id": 5
     },
     {
-      "id": 6,
       "code": "C",
       "titleRu": "Категория C",
       "titleKz": "C санаты",
       "descRu": "Грузовые автомобили. Площадка и маршрут по городу.",
       "descKz": "Жүк автомобилі. Алаң және қала бағыты.",
-      "price": 145000,
-      "durationRu": "2,5 месяца",
-      "durationKz": "2,5 ай",
-      "hours": 22,
+      "price": 54990,
+      "durationRu": "2,5-3месяца",
+      "durationKz": "2,5-3месяца",
+      "hours": 60,
       "featured": false,
-      "sortOrder": 60
+      "sortOrder": 60,
+      "id": 6
     },
     {
-      "id": 7,
       "code": "C1",
       "titleRu": "Категория C1",
       "titleKz": "C1 санаты",
       "descRu": "Средние грузовики. Отдельная программа без полной C.",
       "descKz": "Орта жүк көліктері. Толық C-сіз жеке бағдарлама.",
-      "price": 130000,
+      "price": 54989,
       "durationRu": "2 месяца",
       "durationKz": "2 ай",
       "hours": 18,
       "featured": false,
-      "sortOrder": 70
+      "sortOrder": 70,
+      "id": 7
     }
   ],
   "contacts": {
@@ -399,72 +369,73 @@
     "addressKz": "Түркістан, Тәуке хан даңғылы, 287, 1 қабат",
     "hoursRu": "Пн–Сб 09:00–17:30",
     "hoursKz": "Дс–Сб 09:00–17:30",
-    "instagram": "",
+    "instagram": "https://www.instagram.com/avtoshkola_turkestan_avtoemir?stkn=MWlrYTNiaTJyNnh2cw==",
     "lat": "43.301926",
     "lng": "68.25492",
-    "enrolledBase": 186
+    "enrolledBase": 75,
+    "mapUrl": "https://go.2gis.com/cD14G"
   },
   "instructors": [
     {
-      "id": 1,
       "initials": "ЕС",
       "nameRu": "Ерлан Сейтов",
       "nameKz": "Ерлан Сейтов",
       "roleRu": "Инструктор категории B, город",
       "roleKz": "B санатының нұсқаушысы, қала",
       "sortOrder": 1,
+      "id": 1,
       "photo": ""
     },
     {
-      "id": 2,
       "initials": "АН",
       "nameRu": "Айгуль Нуртазина",
       "nameKz": "Айгүл Нұртазина",
       "roleRu": "Преподаватель ПДД, казахский и русский",
       "roleKz": "ЖҚЕ оқытушысы, қазақ және орыс",
       "sortOrder": 2,
+      "id": 2,
       "photo": ""
     },
     {
-      "id": 3,
       "initials": "МЖ",
       "nameRu": "Марат Жунусов",
       "nameKz": "Марат Жүнісов",
       "roleRu": "Автодром, категории C и C1",
       "roleKz": "Автодром, C және C1 санаттары",
       "sortOrder": 3,
+      "id": 3,
       "photo": ""
     }
   ],
   "reviews": [
     {
-      "id": 1,
       "nameRu": "Зарина О.",
       "nameKz": "Зарина О.",
       "bodyRu": "Учусь второй день — всё нравится. Объясняют спокойно, без спешки. Можно на казахском.",
       "bodyKz": "Екінші күн оқып жатырмын — бәрі ұнайды. Асықпай, сабырмен түсіндіреді. Қазақша да болады.",
       "rating": 5,
       "sortOrder": 1,
+      "id": 1,
       "avatar": ""
     },
     {
-      "id": 2,
       "nameRu": "Эмиль А.",
       "nameKz": "Эмиль А.",
       "bodyRu": "Хорошая автошкола и свой автодром. Уроки на русском и казахском, преподаватели доброжелательные.",
       "bodyKz": "Жақсы автомектеп, өз автодромы бар. Сабақ орысша және қазақша, мұғалімдер жайдарлы.",
       "rating": 5,
       "sortOrder": 2,
+      "id": 2,
       "avatar": ""
     },
     {
-      "id": 3,
       "nameRu": "Bella R.",
       "nameKz": "Bella R.",
       "bodyRu": "Всё понятно, спокойно и с терпением. Инструкторы — профессионалы. После занятий появилась уверенность за рулём.",
       "bodyKz": "Бәрі түсінікті, сабырлы. Нұсқаушылар — өз ісінің шебері. Сабақтан кейін рульде сенім пайда болды.",
       "rating": 5,
       "sortOrder": 3,
+      "id": 3,
       "avatar": ""
     }
   ],
