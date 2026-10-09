@@ -137,13 +137,21 @@ export function HomeView({ payload }: { payload: SitePayload }) {
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <img
-              src="/images/autodrome.jpg"
+              src={live.media.autodrome || "/images/autodrome.jpg"}
               alt=""
               className="h-56 w-full rounded-xl object-cover sm:h-full"
             />
             <div className="grid gap-3">
-              <img src="/images/lesson.jpg" alt="" className="h-40 w-full rounded-xl object-cover" />
-              <img src="/images/theory.jpg" alt="" className="h-40 w-full rounded-xl object-cover" />
+              <img
+                src={live.media.lesson || "/images/lesson.jpg"}
+                alt=""
+                className="h-40 w-full rounded-xl object-cover"
+              />
+              <img
+                src={live.media.theory || "/images/theory.jpg"}
+                alt=""
+                className="h-40 w-full rounded-xl object-cover"
+              />
             </div>
           </div>
         </div>
@@ -175,9 +183,17 @@ export function HomeView({ payload }: { payload: SitePayload }) {
           <div className="mt-10 grid gap-4 sm:grid-cols-3">
             {live.instructors.map((person) => (
               <article key={person.id} className="rounded-xl border border-border bg-bg p-5">
-                <div className="flex size-12 items-center justify-center rounded-lg border border-border font-display text-sm tracking-wide">
-                  {person.initials}
-                </div>
+                {person.photo ? (
+                  <img
+                    src={person.photo}
+                    alt=""
+                    className="size-12 rounded-lg object-cover"
+                  />
+                ) : (
+                  <div className="flex size-12 items-center justify-center rounded-lg border border-border font-display text-sm tracking-wide">
+                    {person.initials}
+                  </div>
+                )}
                 <h3 className="mt-4 text-base font-medium">
                   {field(person, lang, "nameRu", "nameKz")}
                 </h3>
@@ -203,7 +219,10 @@ export function HomeView({ payload }: { payload: SitePayload }) {
                 <p className="text-sm leading-relaxed text-fg">
                   {field(review, lang, "bodyRu", "bodyKz")}
                 </p>
-                <footer className="mt-4 text-xs uppercase tracking-[0.14em] text-muted">
+                <footer className="mt-4 flex items-center gap-3 text-xs uppercase tracking-[0.14em] text-muted">
+                  {review.avatar ? (
+                    <img src={review.avatar} alt="" className="size-8 rounded-full object-cover" />
+                  ) : null}
                   {field(review, lang, "nameRu", "nameKz")}
                 </footer>
               </blockquote>

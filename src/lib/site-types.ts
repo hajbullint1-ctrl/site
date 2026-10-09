@@ -38,6 +38,7 @@ export type Instructor = {
   nameKz: string;
   roleRu: string;
   roleKz: string;
+  photo: string;
   sortOrder: number;
 };
 
@@ -48,6 +49,7 @@ export type Review = {
   bodyRu: string;
   bodyKz: string;
   rating: number;
+  avatar: string;
   sortOrder: number;
 };
 
@@ -62,10 +64,17 @@ export type Booking = {
 };
 
 /** Published site copy: texts, prices, contacts. Lives in app-data.json. */
+export type SiteMedia = {
+  autodrome: string;
+  lesson: string;
+  theory: string;
+};
+
 export type SiteContent = {
   texts: Record<string, { ru: string; kz: string }>;
   services: Service[];
   contacts: ContactInfo;
+  media: SiteMedia;
   instructors: Instructor[];
   reviews: Review[];
 };

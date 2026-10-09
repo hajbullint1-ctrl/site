@@ -1,19 +1,30 @@
 import { useEffect, useState } from "react";
 import appData from "@/lib/app-data/app-data.json";
-import type { SiteContent, SitePayload } from "@/lib/site-types";
+import type { SiteContent, SiteMedia, SitePayload } from "@/lib/site-types";
 
 export { contentFromPayload, toPrettyJson } from "@/lib/site-json";
 
 export const SITE_CONTENT_KEY = "ae-site-content";
 export const SITE_CONTENT_EVENT = "ae-site-content-change";
 
+export const DEFAULT_MEDIA: SiteMedia = {
+  autodrome: "/images/autodrome.jpg",
+  lesson: "/images/lesson.jpg",
+  theory: "/images/theory.jpg",
+};
+
 function asContent(raw: typeof appData): SiteContent {
   return {
     texts: raw.texts,
     services: [...raw.services].sort((a, b) => a.sortOrder - b.sortOrder),
     contacts: raw.contacts,
-    instructors: [...raw.instructors].sort((a, b) => a.sortOrder - b.sortOrder),
-    reviews: [...raw.reviews].sort((a, b) => a.sortOrder - b.sortOrder),
+    media: { ...DEFAULT_MEDIA, ...raw.media },
+    instructors: [...raw.instructors]
+      .map((item) => ({ ...item, photo: item.photo ?? "" }))
+      .sort((a, b) => a.sortOrder - b.sortOrder),
+    reviews: [...raw.reviews]
+      .map((item) => ({ ...item, avatar: item.avatar ?? "" }))
+      .sort((a, b) => a.sortOrder - b.sortOrder),
   };
 }
 
@@ -31,8 +42,15 @@ export function readLocalContent(): SiteContent | null {
       texts: parsed.texts,
       services: parsed.services ?? siteContent.services,
       contacts: parsed.contacts ?? siteContent.contacts,
-      instructors: parsed.instructors ?? siteContent.instructors,
-      reviews: parsed.reviews ?? siteContent.reviews,
+      media: { ...DEFAULT_MEDIA, ...parsed.media },
+      instructors: (parsed.instructors ?? siteContent.instructors).map((item) => ({
+        ...item,
+        photo: item.photo ?? "",
+      })),
+      reviews: (parsed.reviews ?? siteContent.reviews).map((item) => ({
+        ...item,
+        avatar: item.avatar ?? "",
+      })),
     };
   } catch {
     return null;
@@ -75,6 +93,7 @@ export function useSiteContent(server?: SitePayload | null): SitePayload {
       texts: fallback.texts ?? siteContent.texts,
       services: fallback.services?.length ? fallback.services : siteContent.services,
       contacts: fallback.contacts ?? siteContent.contacts,
+      media: { ...DEFAULT_MEDIA, ...fallback.media },
       instructors: fallback.instructors?.length ? fallback.instructors : siteContent.instructors,
       reviews: fallback.reviews?.length ? fallback.reviews : siteContent.reviews,
       bookingCount: fallback.bookingCount,

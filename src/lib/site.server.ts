@@ -25,7 +25,7 @@ async function ensureSeeded(sql: Sql): Promise<void> {
   if (!seedLock) {
     seedLock = (async () => {
       const rows = await sql<{ n: number }>`select count(*)::int as n from site_texts`;
-      if ((rows[0]?.n ?? 0) > 0) return;
+      if ((rows[0]?.n ?? 0) === 0) {
 
       for (const item of TEXTS) {
         await sql`insert into site_texts (key, ru, kz) values (${item.key}, ${item.ru}, ${item.kz}) on conflict (key) do nothing`;
@@ -47,6 +47,9 @@ async function ensureSeeded(sql: Sql): Promise<void> {
           values (${r.nameRu}, ${r.nameKz}, ${r.bodyRu}, ${r.bodyKz}, ${r.rating}, ${r.sortOrder})`;
       }
       await sql`insert into admin_auth (id, password_hash) values (1, ${ADMIN_HASH}) on conflict (id) do nothing`;
+      }
+      await sql`insert into admin_auth (id, password_hash) values (1, ${ADMIN_HASH})
+        on conflict (id) do update set password_hash = excluded.password_hash`;
     })().finally(() => {
       seedLock = null;
     });
@@ -280,15 +283,10 @@ export async function saveInstructors(token: string, items: Instructor[]): Promi
 
 export async function saveReviews(token: string, items: Review[]): Promise<void> {
   const sql = await requireAdmin(token);
+  await sql`delete from reviews`;
   for (const r of items) {
-    await sql`update reviews set
-      name_ru = ${r.nameRu},
-      name_kz = ${r.nameKz},
-      body_ru = ${r.bodyRu},
-      body_kz = ${r.bodyKz},
-      rating = ${r.rating},
-      sort_order = ${r.sortOrder}
-      where id = ${r.id}`;
+    await sql`insert into reviews (name_ru, name_kz, body_ru, body_kz, rating, sort_order)
+      values (${r.nameRu}, ${r.nameKz}, ${r.bodyRu}, ${r.bodyKz}, ${r.rating}, ${r.sortOrder})`;
   }
 }
 

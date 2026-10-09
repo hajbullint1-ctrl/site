@@ -33,10 +33,17 @@ const contactsSchema = z.object({
   enrolledBase: z.number().int().min(0).max(100000),
 });
 
+const mediaSchema = z.object({
+  autodrome: z.string().max(500),
+  lesson: z.string().max(500),
+  theory: z.string().max(500),
+});
+
 export const siteContentSchema = z.object({
   texts: z.record(z.string(), locSchema),
   services: z.array(serviceSchema),
   contacts: contactsSchema,
+  media: mediaSchema.optional(),
   instructors: z.array(
     z.object({
       id: z.number().int().optional(),
@@ -45,6 +52,7 @@ export const siteContentSchema = z.object({
       nameKz: z.string().max(80),
       roleRu: z.string().max(120),
       roleKz: z.string().max(120),
+      photo: z.string().max(500).optional(),
       sortOrder: z.number().int(),
     }),
   ),
@@ -56,6 +64,7 @@ export const siteContentSchema = z.object({
       bodyRu: z.string().max(800),
       bodyKz: z.string().max(800),
       rating: z.number().int().min(1).max(5),
+      avatar: z.string().max(500).optional(),
       sortOrder: z.number().int(),
     }),
   ),
@@ -80,6 +89,11 @@ export function parseSiteContent(input: unknown): SiteContent {
       sortOrder: s.sortOrder,
     })),
     contacts: parsed.contacts,
+    media: parsed.media ?? {
+      autodrome: "/images/autodrome.jpg",
+      lesson: "/images/lesson.jpg",
+      theory: "/images/theory.jpg",
+    },
     instructors: parsed.instructors.map((item, i) => ({
       id: item.id ?? i + 1,
       initials: item.initials,
@@ -87,6 +101,7 @@ export function parseSiteContent(input: unknown): SiteContent {
       nameKz: item.nameKz,
       roleRu: item.roleRu,
       roleKz: item.roleKz,
+      photo: item.photo ?? "",
       sortOrder: item.sortOrder,
     })),
     reviews: parsed.reviews.map((item, i) => ({
@@ -96,6 +111,7 @@ export function parseSiteContent(input: unknown): SiteContent {
       bodyRu: item.bodyRu,
       bodyKz: item.bodyKz,
       rating: item.rating,
+      avatar: item.avatar ?? "",
       sortOrder: item.sortOrder,
     })),
   };
@@ -223,6 +239,7 @@ export const saveInstructorsFn = createServerFn({ method: "POST" })
           nameKz: z.string().max(80),
           roleRu: z.string().max(120),
           roleKz: z.string().max(120),
+          photo: z.string().max(500).optional(),
           sortOrder: z.number().int(),
         }),
       ),
@@ -246,6 +263,7 @@ export const saveReviewsFn = createServerFn({ method: "POST" })
           bodyRu: z.string().max(800),
           bodyKz: z.string().max(800),
           rating: z.number().int().min(1).max(5),
+          avatar: z.string().max(500).optional(),
           sortOrder: z.number().int(),
         }),
       ),

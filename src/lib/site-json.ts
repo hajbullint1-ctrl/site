@@ -5,6 +5,7 @@ export function contentFromPayload(payload: SitePayload): SiteContent {
     texts: payload.texts,
     services: payload.services,
     contacts: payload.contacts,
+    media: payload.media,
     instructors: payload.instructors,
     reviews: payload.reviews,
   };
@@ -18,6 +19,7 @@ export function toPrettyJson(content: SiteContent): string {
       texts: content.texts,
       services: content.services,
       contacts: content.contacts,
+      media: content.media,
       instructors: content.instructors,
       reviews: content.reviews,
     },

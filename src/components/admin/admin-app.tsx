@@ -31,7 +31,7 @@ import {
 } from "@/lib/site-content";
 import { mapGithubError } from "@/lib/github-errors";
 import { cn, waLink } from "@/lib/utils";
-import type { ContactInfo, Instructor, Review, Service, SitePayload } from "@/lib/site-types";
+import type { ContactInfo, Instructor, Review, Service, SiteMedia, SitePayload } from "@/lib/site-types";
 
 const TOKEN_KEY = "ae-admin-token";
 type Tab = "texts" | "services" | "contacts" | "bookings" | "team" | "json";
@@ -130,7 +130,7 @@ function AdminShell({ token, onLogout }: { token: string; onLogout: () => void }
     { id: "texts", label: "Тексты" },
     { id: "services", label: "Цены" },
     { id: "contacts", label: "Контакты" },
-    { id: "team", label: "Команда" },
+    { id: "team", label: "Команда и фото" },
     { id: "bookings", label: `Заявки (${bookings.data?.length ?? 0})` },
     { id: "json", label: "JSON / Резервная копия" },
   ];
@@ -637,26 +637,73 @@ function TeamEditor({
 }) {
   const [instructors, setInstructors] = useState<Instructor[]>(payload.instructors);
   const [reviews, setReviews] = useState<Review[]>(payload.reviews);
+  const [media, setMedia] = useState<SiteMedia>(payload.media);
+  const [pending, setPending] = useState(false);
+
+  function nextId(items: { id: number }[]) {
+    return items.reduce((max, item) => Math.max(max, item.id), 0) + 1;
+  }
+
+  async function persist(publish: boolean) {
+    setPending(true);
+    const content = {
+      ...contentFromPayload(payload),
+      instructors,
+      reviews,
+      media,
+    };
+    saveLocalContent(content);
+    try {
+      await saveInstructorsFn({ data: { token, items: instructors } });
+      await saveReviewsFn({ data: { token, items: reviews } });
+      if (publish) {
+        await publishSiteFn({ data: { token, content } });
+        toast.success("Сохранено и отправлено в app-data.json. Сайт обновится после сборки.");
+      } else {
+        toast.success("Сохранено");
+      }
+      onSaved();
+    } catch (err) {
+      toast.error(publish ? mapGithubError(err) : "Ошибка сохранения");
+    } finally {
+      setPending(false);
+    }
+  }
 
   return (
     <div className="space-y-10">
       <section>
+        <h1 className="font-display text-2xl">Фото и дизайн</h1>
+        <p className="mt-2 text-sm text-muted">
+          Ссылка на картинку: адрес в интернете или путь вроде /images/lesson.jpg
+        </p>
+        <div className="mt-4 grid gap-3 md:grid-cols-3">
+          <Field label="Автодром">
+            <Input
+              value={media.autodrome}
+              onChange={(e) => setMedia({ ...media, autodrome: e.target.value })}
+              placeholder="https://..."
+            />
+          </Field>
+          <Field label="Практика">
+            <Input
+              value={media.lesson}
+              onChange={(e) => setMedia({ ...media, lesson: e.target.value })}
+              placeholder="https://..."
+            />
+          </Field>
+          <Field label="Теория">
+            <Input
+              value={media.theory}
+              onChange={(e) => setMedia({ ...media, theory: e.target.value })}
+              placeholder="https://..."
+            />
+          </Field>
+        </div>
+      </section>
+      <section>
         <div className="flex items-center justify-between">
-          <h1 className="font-display text-2xl">Инструкторы</h1>
-          <Button
-            onClick={async () => {
-              try {
-                await saveInstructorsFn({ data: { token, items: instructors } });
-                saveLocalContent({ ...contentFromPayload(payload), instructors });
-                toast.success("Сохранено");
-                onSaved();
-              } catch {
-                toast.error("Ошибка");
-              }
-            }}
-          >
-            Сохранить
-          </Button>
+          <h2 className="font-display text-2xl">Инструкторы</h2>
         </div>
         <div className="mt-4 space-y-3">
           {instructors.map((p, idx) => (
@@ -701,7 +748,7 @@ function TeamEditor({
                   }
                 />
               </Field>
-              <Field label="Роль KZ" className="sm:col-span-5">
+              <Field label="Роль KZ" className="sm:col-span-3">
                 <Input
                   value={p.roleKz}
                   onChange={(e) =>
@@ -711,31 +758,48 @@ function TeamEditor({
                   }
                 />
               </Field>
+              <Field label="Фото (ссылка)" className="sm:col-span-2">
+                <Input
+                  value={p.photo}
+                  placeholder="https://..."
+                  onChange={(e) =>
+                    setInstructors((list) =>
+                      list.map((x, i) => (i === idx ? { ...x, photo: e.target.value } : x)),
+                    )
+                  }
+                />
+              </Field>
             </div>
           ))}
         </div>
       </section>
       <section>
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-3">
           <h2 className="font-display text-2xl">Отзывы</h2>
           <Button
-            onClick={async () => {
-              try {
-                await saveReviewsFn({ data: { token, items: reviews } });
-                saveLocalContent({ ...contentFromPayload(payload), reviews });
-                toast.success("Отзывы сохранены");
-                onSaved();
-              } catch {
-                toast.error("Ошибка");
-              }
-            }}
+            variant="outline"
+            onClick={() =>
+              setReviews((list) => [
+                ...list,
+                {
+                  id: nextId(list),
+                  nameRu: "Новый отзыв",
+                  nameKz: "Жаңа пікір",
+                  bodyRu: "",
+                  bodyKz: "",
+                  rating: 5,
+                  avatar: "",
+                  sortOrder: list.length + 1,
+                },
+              ])
+            }
           >
-            Сохранить
+            Добавить отзыв
           </Button>
         </div>
         <div className="mt-4 space-y-3">
           {reviews.map((r, idx) => (
-            <div key={r.id} className="grid gap-3 rounded-lg border border-border bg-surface p-4 md:grid-cols-2">
+            <div key={`${r.id}-${idx}`} className="grid gap-3 rounded-lg border border-border bg-surface p-4 md:grid-cols-2">
               <Field label="Имя RU">
                 <Input
                   value={r.nameRu}
@@ -778,10 +842,37 @@ function TeamEditor({
                   }
                 />
               </Field>
+              <Field label="Аватар (ссылка)" className="md:col-span-2">
+                <Input
+                  value={r.avatar}
+                  placeholder="https://..."
+                  onChange={(e) =>
+                    setReviews((list) =>
+                      list.map((x, i) => (i === idx ? { ...x, avatar: e.target.value } : x)),
+                    )
+                  }
+                />
+              </Field>
+              <div className="md:col-span-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setReviews((list) => list.filter((_, i) => i !== idx))}
+                >
+                  Удалить отзыв
+                </Button>
+              </div>
             </div>
           ))}
         </div>
       </section>
+      <div className="flex flex-wrap gap-2">
+        <Button disabled={pending} onClick={() => void persist(false)}>
+          Сохранить
+        </Button>
+        <Button disabled={pending} variant="secondary" onClick={() => void persist(true)}>
+          Сохранить и опубликовать
+        </Button>
+      </div>
     </div>
   );
 }
