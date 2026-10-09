@@ -70,7 +70,7 @@ function Login({ onToken }: { onToken: (token: string) => void }) {
     setPending(true);
     setError("");
     try {
-      const res = await adminLoginFn({ data: { password } });
+      const res = await adminLoginFn({ data: { password: password.trim() } });
       onToken(res.token);
     } catch {
       setError("Неверный пароль");
@@ -92,9 +92,12 @@ function Login({ onToken }: { onToken: (token: string) => void }) {
           <Label>Пароль</Label>
           <Input
             type="password"
+            name="ae-school-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            autoComplete="current-password"
+            autoComplete="off"
+            autoCorrect="off"
+            spellCheck={false}
             required
           />
         </label>

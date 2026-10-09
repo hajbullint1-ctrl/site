@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { getSql, type Sql } from "@/lib/db";
 import type {
   Booking,
@@ -12,11 +12,35 @@ import type {
 import { TEXTS, SERVICES, INSTRUCTORS, REVIEWS, CONTACTS } from "@/lib/seed-data";
 import { siteContent } from "@/lib/site-content";
 
+const ADMIN_PASSWORD = "emir2026";
 const ADMIN_HASH =
   "a3bff63d72c4c15ea3b386b58ae2a42fdf31915dbb9e0fcecabca62e7b9d774c";
+const TOKEN_SECRET = "auto-emir-admin-session-v1";
 
 function hashPassword(password: string): string {
   return createHash("sha256").update(`auto-emir::${password}`).digest("hex");
+}
+
+function signAdminToken(): string {
+  const exp = Date.now() + 12 * 60 * 60 * 1000;
+  const body = Buffer.from(JSON.stringify({ exp, v: 1 })).toString("base64url");
+  const sig = createHmac("sha256", TOKEN_SECRET).update(body).digest("base64url");
+  return `${body}.${sig}`;
+}
+
+function readSignedToken(token: string): boolean {
+  const [body, sig] = token.split(".");
+  if (!body || !sig) return false;
+  const expected = createHmac("sha256", TOKEN_SECRET).update(body).digest("base64url");
+  const a = Buffer.from(sig);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length || !timingSafeEqual(a, b)) return false;
+  try {
+    const payload = JSON.parse(Buffer.from(body, "base64url").toString("utf8")) as { exp?: number };
+    return typeof payload.exp === "number" && payload.exp > Date.now();
+  } catch {
+    return false;
+  }
 }
 
 let seedLock: Promise<void> | null = null;
@@ -118,6 +142,7 @@ export async function createBooking(input: {
 async function requireAdmin(token: string): Promise<Sql> {
   const sql = await getSql();
   await ensureSeeded(sql);
+  if (readSignedToken(token)) return sql;
   const rows = await sql<{ token: string | null; token_expires: string | null }>`
     select token, token_expires from admin_auth where id = 1`;
   const row = rows[0];
@@ -129,14 +154,24 @@ async function requireAdmin(token: string): Promise<Sql> {
 }
 
 export async function adminLogin(password: string): Promise<{ token: string }> {
-  const sql = await getSql();
-  await ensureSeeded(sql);
-  const rows = await sql<{ password_hash: string }>`select password_hash from admin_auth where id = 1`;
-  const hash = rows[0]?.password_hash ?? ADMIN_HASH;
-  if (hashPassword(password) !== hash) throw new Error("invalid_password");
-  const token = randomBytes(24).toString("hex");
-  const expires = new Date(Date.now() + 1000 * 60 * 60 * 12).toISOString();
-  await sql`update admin_auth set token = ${token}, token_expires = ${expires}::timestamptz where id = 1`;
+  const given = password.trim();
+  if (given !== ADMIN_PASSWORD && hashPassword(given) !== ADMIN_HASH) {
+    throw new Error("invalid_password");
+  }
+  const token = signAdminToken();
+  try {
+    const sql = await getSql();
+    await ensureSeeded(sql);
+    const expires = new Date(Date.now() + 1000 * 60 * 60 * 12).toISOString();
+    await sql`insert into admin_auth (id, password_hash, token, token_expires)
+      values (1, ${ADMIN_HASH}, ${token}, ${expires}::timestamptz)
+      on conflict (id) do update set
+        password_hash = excluded.password_hash,
+        token = excluded.token,
+        token_expires = excluded.token_expires`;
+  } catch {
+    // Signed token is enough to open the cabinet if the database is busy.
+  }
   return { token };
 }
 
