@@ -18,8 +18,6 @@ import {
   removeBookingFn,
   removeServiceFn,
   saveContactsFn,
-  saveInstructorsFn,
-  saveReviewsFn,
   saveServiceFn,
   saveTextsFn,
 } from "@/lib/site-api";
@@ -34,6 +32,7 @@ import { cn, waLink } from "@/lib/utils";
 import type { ContactInfo, Instructor, Review, Service, SiteMedia, SitePayload } from "@/lib/site-types";
 
 const TOKEN_KEY = "ae-admin-token";
+const SAVED = "Сохранено в app-data.json. У всех обновится в течение нескольких секунд.";
 type Tab = "texts" | "services" | "contacts" | "bookings" | "team" | "json";
 
 export function AdminApp() {
@@ -303,12 +302,13 @@ function TextsEditor({
   async function save() {
     setPending(true);
     try {
-      await saveTextsFn({ data: { token, items } });
-      saveLocalContent({ ...contentFromPayload(payload), texts: draft });
-      toast.success("Тексты сохранены — сайт обновится сразу");
+      const content = { ...contentFromPayload(payload), texts: draft };
+      await saveTextsFn({ data: { token, items, content } });
+      saveLocalContent(content);
+      toast.success(SAVED);
       onSaved();
-    } catch {
-      toast.error("Не удалось сохранить");
+    } catch (err) {
+      toast.error(mapGithubError(err));
     } finally {
       setPending(false);
     }
@@ -385,6 +385,8 @@ function ServicesEditor({
 
   async function saveOne(s: Service) {
     try {
+      const services = rows.map((row) => (row.id === s.id ? { ...s, price: Number(s.price) } : row));
+      const content = { ...contentFromPayload(payload), services };
       await saveServiceFn({
         data: {
           token,
@@ -402,61 +404,60 @@ function ServicesEditor({
             featured: s.featured,
             sortOrder: s.sortOrder,
           },
+          content,
         },
       });
-      saveLocalContent({
-        ...contentFromPayload(payload),
-        services: rows.map((row) => (row.id === s.id ? s : row)),
-      });
-      toast.success(`Категория ${s.code} сохранена`);
+      saveLocalContent(content);
+      toast.success(SAVED);
       onSaved();
-    } catch {
-      toast.error("Ошибка сохранения");
+    } catch (err) {
+      toast.error(mapGithubError(err));
     }
   }
 
   async function addNew() {
     try {
+      const createdLocal: Service = {
+        id: rows.reduce((max, row) => Math.max(max, row.id), 0) + 1,
+        code: "D",
+        titleRu: "Новая категория",
+        titleKz: "Жаңа санат",
+        descRu: "",
+        descKz: "",
+        price: 0,
+        durationRu: "",
+        durationKz: "",
+        hours: 10,
+        featured: false,
+        sortOrder: 90,
+      };
+      const content = { ...contentFromPayload(payload), services: [...rows, createdLocal] };
       const created = await saveServiceFn({
-        data: {
-          token,
-          service: {
-            code: "D",
-            titleRu: "Новая категория",
-            titleKz: "Жаңа санат",
-            descRu: "",
-            descKz: "",
-            price: 0,
-            durationRu: "",
-            durationKz: "",
-            hours: 10,
-            featured: false,
-            sortOrder: 90,
-          },
-        },
+        data: { token, service: createdLocal, content },
       });
       saveLocalContent({
-        ...contentFromPayload(payload),
-        services: [...rows, created],
+        ...content,
+        services: content.services.map((row) => (row.id === createdLocal.id ? created : row)),
       });
-      toast.success("Категория добавлена");
+      toast.success(SAVED);
       onSaved();
-    } catch {
-      toast.error("Не удалось добавить");
+    } catch (err) {
+      toast.error(mapGithubError(err));
     }
   }
 
   async function remove(id: number) {
     try {
-      await removeServiceFn({ data: { token, id } });
-      saveLocalContent({
+      const content = {
         ...contentFromPayload(payload),
         services: rows.filter((s) => s.id !== id),
-      });
-      toast.success("Удалено");
+      };
+      await removeServiceFn({ data: { token, id, content } });
+      saveLocalContent(content);
+      toast.success(SAVED);
       onSaved();
-    } catch {
-      toast.error("Не удалось удалить");
+    } catch (err) {
+      toast.error(mapGithubError(err));
     }
   }
 
@@ -567,12 +568,14 @@ function ContactsEditor({
   async function save() {
     setPending(true);
     try {
-      await saveContactsFn({ data: { token, contacts: { ...c, enrolledBase: Number(c.enrolledBase) } } });
-      saveLocalContent({ ...contentFromPayload(payload), contacts: { ...c, enrolledBase: Number(c.enrolledBase) } });
-      toast.success("Контакты обновлены");
+      const contacts = { ...c, enrolledBase: Number(c.enrolledBase) };
+      const content = { ...contentFromPayload(payload), contacts };
+      await saveContactsFn({ data: { token, contacts, content } });
+      saveLocalContent(content);
+      toast.success(SAVED);
       onSaved();
-    } catch {
-      toast.error("Ошибка");
+    } catch (err) {
+      toast.error(mapGithubError(err));
     } finally {
       setPending(false);
     }
@@ -647,7 +650,7 @@ function TeamEditor({
     return items.reduce((max, item) => Math.max(max, item.id), 0) + 1;
   }
 
-  async function persist(publish: boolean) {
+  async function persist() {
     setPending(true);
     const content = {
       ...contentFromPayload(payload),
@@ -657,17 +660,11 @@ function TeamEditor({
     };
     saveLocalContent(content);
     try {
-      await saveInstructorsFn({ data: { token, items: instructors } });
-      await saveReviewsFn({ data: { token, items: reviews } });
-      if (publish) {
-        await publishSiteFn({ data: { token, content } });
-        toast.success("Сохранено и отправлено в app-data.json. Сайт обновится после сборки.");
-      } else {
-        toast.success("Сохранено");
-      }
+      await publishSiteFn({ data: { token, content } });
+      toast.success(SAVED);
       onSaved();
     } catch (err) {
-      toast.error(publish ? mapGithubError(err) : "Ошибка сохранения");
+      toast.error(mapGithubError(err));
     } finally {
       setPending(false);
     }
@@ -869,11 +866,8 @@ function TeamEditor({
         </div>
       </section>
       <div className="flex flex-wrap gap-2">
-        <Button disabled={pending} onClick={() => void persist(false)}>
+        <Button disabled={pending} onClick={() => void persist()}>
           Сохранить
-        </Button>
-        <Button disabled={pending} variant="secondary" onClick={() => void persist(true)}>
-          Сохранить и опубликовать
         </Button>
       </div>
     </div>
@@ -959,7 +953,7 @@ function JsonBackup({
     try {
       const parsed = applyLocal(draft);
       await publishSiteFn({ data: { token, content: parsed } });
-      toast.success("Опубликовано. На живом сайте цены обновятся после выкладки.");
+      toast.success(SAVED);
     } catch (err) {
       if (err instanceof SyntaxError) {
         toast.error("JSON с ошибкой. Проверьте запятые и кавычки.");

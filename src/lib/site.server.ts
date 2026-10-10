@@ -10,7 +10,6 @@ import type {
   SitePayload,
 } from "@/lib/site-types";
 import { TEXTS, SERVICES, INSTRUCTORS, REVIEWS, CONTACTS } from "@/lib/seed-data";
-import { siteContent } from "@/lib/site-content";
 
 const ADMIN_PASSWORD = "emir2026";
 const ADMIN_HASH =
@@ -112,13 +111,18 @@ function mapService(row: {
 }
 
 export async function loadSite(): Promise<SitePayload> {
-  const sql = await getSql();
-  await ensureSeeded(sql);
-  const countRows = await sql<{ n: number }>`select count(*)::int as n from bookings`;
-  return {
-    ...siteContent,
-    bookingCount: Number(countRows[0]?.n ?? 0),
-  };
+  let bookingCount = 0;
+  try {
+    const sql = await getSql();
+    await ensureSeeded(sql);
+    const countRows = await sql<{ n: number }>`select count(*)::int as n from bookings`;
+    bookingCount = Number(countRows[0]?.n ?? 0);
+  } catch {
+    bookingCount = 0;
+  }
+  const { readPublishedContent } = await import("./github-publish.server.ts");
+  const live = await readPublishedContent();
+  return { ...live, bookingCount };
 }
 
 export async function createBooking(input: {
@@ -140,16 +144,9 @@ export async function createBooking(input: {
 }
 
 async function requireAdmin(token: string): Promise<Sql> {
+  if (!readSignedToken(token)) throw new Error("unauthorized");
   const sql = await getSql();
   await ensureSeeded(sql);
-  if (readSignedToken(token)) return sql;
-  const rows = await sql<{ token: string | null; token_expires: string | null }>`
-    select token, token_expires from admin_auth where id = 1`;
-  const row = rows[0];
-  if (!row?.token || row.token !== token) throw new Error("unauthorized");
-  if (row.token_expires && new Date(row.token_expires).getTime() < Date.now()) {
-    throw new Error("unauthorized");
-  }
   return sql;
 }
 
@@ -184,95 +181,141 @@ export async function adminLogout(token: string): Promise<void> {
   }
 }
 
+async function publishLive(token: string, content: SiteContent) {
+  if (!readSignedToken(token)) throw new Error("unauthorized");
+  const { publishAppDataJson } = await import("./github-publish.server.ts");
+  return publishAppDataJson(content);
+}
+
 export async function saveTexts(
   token: string,
   items: { key: string; ru: string; kz: string }[],
+  content: SiteContent,
 ): Promise<void> {
-  const sql = await requireAdmin(token);
-  for (const item of items) {
-    await sql`insert into site_texts (key, ru, kz) values (${item.key}, ${item.ru}, ${item.kz})
-      on conflict (key) do update set ru = excluded.ru, kz = excluded.kz`;
+  if (!readSignedToken(token)) throw new Error("unauthorized");
+  try {
+    const sql = await requireAdmin(token);
+    for (const item of items) {
+      await sql`insert into site_texts (key, ru, kz) values (${item.key}, ${item.ru}, ${item.kz})
+        on conflict (key) do update set ru = excluded.ru, kz = excluded.kz`;
+    }
+  } catch (err) {
+    if (err instanceof Error && err.message === "unauthorized") throw err;
   }
+  const texts = { ...content.texts };
+  for (const item of items) texts[item.key] = { ru: item.ru, kz: item.kz };
+  await publishLive(token, { ...content, texts });
 }
 
-export async function saveContacts(token: string, data: ContactInfo): Promise<void> {
-  const sql = await requireAdmin(token);
-  await sql`update contacts set
-    phone = ${data.phone},
-    whatsapp = ${data.whatsapp},
-    telegram = ${data.telegram},
-    address_ru = ${data.addressRu},
-    address_kz = ${data.addressKz},
-    hours_ru = ${data.hoursRu},
-    hours_kz = ${data.hoursKz},
-    instagram = ${data.instagram},
-    lat = ${data.lat},
-    lng = ${data.lng},
-    enrolled_base = ${data.enrolledBase}
-    where id = 1`;
+export async function saveContacts(token: string, data: ContactInfo, content: SiteContent): Promise<void> {
+  if (!readSignedToken(token)) throw new Error("unauthorized");
+  try {
+    const sql = await requireAdmin(token);
+    await sql`update contacts set
+      phone = ${data.phone},
+      whatsapp = ${data.whatsapp},
+      telegram = ${data.telegram},
+      address_ru = ${data.addressRu},
+      address_kz = ${data.addressKz},
+      hours_ru = ${data.hoursRu},
+      hours_kz = ${data.hoursKz},
+      instagram = ${data.instagram},
+      lat = ${data.lat},
+      lng = ${data.lng},
+      enrolled_base = ${data.enrolledBase}
+      where id = 1`;
+  } catch (err) {
+    if (err instanceof Error && err.message === "unauthorized") throw err;
+  }
+  await publishLive(token, { ...content, contacts: data });
 }
 
 export async function saveService(
   token: string,
   data: Omit<Service, "id"> & { id?: number },
+  content: SiteContent,
 ): Promise<Service> {
-  const sql = await requireAdmin(token);
-  if (data.id) {
-    const rows = await sql<{
-      id: number;
-      code: string;
-      title_ru: string;
-      title_kz: string;
-      desc_ru: string;
-      desc_kz: string;
-      price: number;
-      duration_ru: string;
-      duration_kz: string;
-      hours: number | null;
-      featured: boolean;
-      sort_order: number;
-    }>`update services set
-        code = ${data.code},
-        title_ru = ${data.titleRu},
-        title_kz = ${data.titleKz},
-        desc_ru = ${data.descRu},
-        desc_kz = ${data.descKz},
-        price = ${data.price},
-        duration_ru = ${data.durationRu},
-        duration_kz = ${data.durationKz},
-        hours = ${data.hours},
-        featured = ${data.featured},
-        sort_order = ${data.sortOrder}
-      where id = ${data.id}
-      returning id, code, title_ru, title_kz, desc_ru, desc_kz, price, duration_ru, duration_kz, hours, featured, sort_order`;
-    const row = rows[0];
-    if (!row) throw new Error("not_found");
-    return mapService(row);
+  if (!readSignedToken(token)) throw new Error("unauthorized");
+  let saved: Service = {
+    id: data.id ?? 0,
+    code: data.code,
+    titleRu: data.titleRu,
+    titleKz: data.titleKz,
+    descRu: data.descRu,
+    descKz: data.descKz,
+    price: data.price,
+    durationRu: data.durationRu,
+    durationKz: data.durationKz,
+    hours: data.hours,
+    featured: data.featured,
+    sortOrder: data.sortOrder,
+  };
+  try {
+    const sql = await requireAdmin(token);
+    if (data.id) {
+      const rows = await sql<{
+        id: number;
+        code: string;
+        title_ru: string;
+        title_kz: string;
+        desc_ru: string;
+        desc_kz: string;
+        price: number;
+        duration_ru: string;
+        duration_kz: string;
+        hours: number | null;
+        featured: boolean;
+        sort_order: number;
+      }>`update services set
+          code = ${data.code},
+          title_ru = ${data.titleRu},
+          title_kz = ${data.titleKz},
+          desc_ru = ${data.descRu},
+          desc_kz = ${data.descKz},
+          price = ${data.price},
+          duration_ru = ${data.durationRu},
+          duration_kz = ${data.durationKz},
+          hours = ${data.hours},
+          featured = ${data.featured},
+          sort_order = ${data.sortOrder}
+        where id = ${data.id}
+        returning id, code, title_ru, title_kz, desc_ru, desc_kz, price, duration_ru, duration_kz, hours, featured, sort_order`;
+      if (rows[0]) saved = mapService(rows[0]);
+    } else {
+      const rows = await sql<{
+        id: number;
+        code: string;
+        title_ru: string;
+        title_kz: string;
+        desc_ru: string;
+        desc_kz: string;
+        price: number;
+        duration_ru: string;
+        duration_kz: string;
+        hours: number | null;
+        featured: boolean;
+        sort_order: number;
+      }>`insert into services (code, title_ru, title_kz, desc_ru, desc_kz, price, duration_ru, duration_kz, hours, featured, sort_order)
+        values (${data.code}, ${data.titleRu}, ${data.titleKz}, ${data.descRu}, ${data.descKz}, ${data.price}, ${data.durationRu}, ${data.durationKz}, ${data.hours}, ${data.featured}, ${data.sortOrder})
+        returning id, code, title_ru, title_kz, desc_ru, desc_kz, price, duration_ru, duration_kz, hours, featured, sort_order`;
+      if (rows[0]) saved = mapService(rows[0]);
+    }
+  } catch (err) {
+    if (err instanceof Error && err.message === "unauthorized") throw err;
   }
-  const rows = await sql<{
-    id: number;
-    code: string;
-    title_ru: string;
-    title_kz: string;
-    desc_ru: string;
-    desc_kz: string;
-    price: number;
-    duration_ru: string;
-    duration_kz: string;
-    hours: number | null;
-    featured: boolean;
-    sort_order: number;
-  }>`insert into services (code, title_ru, title_kz, desc_ru, desc_kz, price, duration_ru, duration_kz, hours, featured, sort_order)
-    values (${data.code}, ${data.titleRu}, ${data.titleKz}, ${data.descRu}, ${data.descKz}, ${data.price}, ${data.durationRu}, ${data.durationKz}, ${data.hours}, ${data.featured}, ${data.sortOrder})
-    returning id, code, title_ru, title_kz, desc_ru, desc_kz, price, duration_ru, duration_kz, hours, featured, sort_order`;
-  const row = rows[0];
-  if (!row) throw new Error("insert_failed");
-  return mapService(row);
+  await publishLive(token, content);
+  return saved;
 }
 
-export async function removeService(token: string, id: number): Promise<void> {
-  const sql = await requireAdmin(token);
-  await sql`delete from services where id = ${id}`;
+export async function removeService(token: string, id: number, content: SiteContent): Promise<void> {
+  if (!readSignedToken(token)) throw new Error("unauthorized");
+  try {
+    const sql = await requireAdmin(token);
+    await sql`delete from services where id = ${id}`;
+  } catch (err) {
+    if (err instanceof Error && err.message === "unauthorized") throw err;
+  }
+  await publishLive(token, content);
 }
 
 export async function listBookings(token: string): Promise<Booking[]> {
@@ -302,27 +345,39 @@ export async function removeBooking(token: string, id: number): Promise<void> {
   await sql`delete from bookings where id = ${id}`;
 }
 
-export async function saveInstructors(token: string, items: Instructor[]): Promise<void> {
-  const sql = await requireAdmin(token);
-  for (const i of items) {
-    await sql`update instructors set
-      initials = ${i.initials},
-      name_ru = ${i.nameRu},
-      name_kz = ${i.nameKz},
-      role_ru = ${i.roleRu},
-      role_kz = ${i.roleKz},
-      sort_order = ${i.sortOrder}
-      where id = ${i.id}`;
+export async function saveInstructors(token: string, items: Instructor[], content: SiteContent): Promise<void> {
+  if (!readSignedToken(token)) throw new Error("unauthorized");
+  try {
+    const sql = await requireAdmin(token);
+    for (const i of items) {
+      await sql`update instructors set
+        initials = ${i.initials},
+        name_ru = ${i.nameRu},
+        name_kz = ${i.nameKz},
+        role_ru = ${i.roleRu},
+        role_kz = ${i.roleKz},
+        sort_order = ${i.sortOrder}
+        where id = ${i.id}`;
+    }
+  } catch (err) {
+    if (err instanceof Error && err.message === "unauthorized") throw err;
   }
+  await publishLive(token, { ...content, instructors: items });
 }
 
-export async function saveReviews(token: string, items: Review[]): Promise<void> {
-  const sql = await requireAdmin(token);
-  await sql`delete from reviews`;
-  for (const r of items) {
-    await sql`insert into reviews (name_ru, name_kz, body_ru, body_kz, rating, sort_order)
-      values (${r.nameRu}, ${r.nameKz}, ${r.bodyRu}, ${r.bodyKz}, ${r.rating}, ${r.sortOrder})`;
+export async function saveReviews(token: string, items: Review[], content: SiteContent): Promise<void> {
+  if (!readSignedToken(token)) throw new Error("unauthorized");
+  try {
+    const sql = await requireAdmin(token);
+    await sql`delete from reviews`;
+    for (const r of items) {
+      await sql`insert into reviews (name_ru, name_kz, body_ru, body_kz, rating, sort_order)
+        values (${r.nameRu}, ${r.nameKz}, ${r.bodyRu}, ${r.bodyKz}, ${r.rating}, ${r.sortOrder})`;
+    }
+  } catch (err) {
+    if (err instanceof Error && err.message === "unauthorized") throw err;
   }
+  await publishLive(token, { ...content, reviews: items });
 }
 
 export async function replaceSiteContent(token: string, content: SiteContent): Promise<void> {
@@ -368,9 +423,13 @@ export async function replaceSiteContent(token: string, content: SiteContent): P
 }
 
 export async function publishSiteContent(token: string, content: SiteContent) {
-  await replaceSiteContent(token, content);
-  const { publishAppDataJson } = await import("./github-publish.server.ts");
-  return publishAppDataJson(content);
+  if (!readSignedToken(token)) throw new Error("unauthorized");
+  try {
+    await replaceSiteContent(token, content);
+  } catch (err) {
+    if (err instanceof Error && err.message === "unauthorized") throw err;
+  }
+  return publishLive(token, content);
 }
 
 export async function publishFromRequest(request: Request): Promise<Response> {

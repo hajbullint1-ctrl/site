@@ -1,4 +1,6 @@
 import { env } from "@/lib/env.server";
+import { parseSiteContent } from "@/lib/site-api";
+import { siteContent } from "@/lib/site-content";
 import { toPrettyJson } from "@/lib/site-json";
 import type { SiteContent } from "@/lib/site-types";
 
@@ -14,13 +16,59 @@ export type GithubPublishResult = {
   commitSha: string;
 };
 
-function githubHeaders(token: string): HeadersInit {
+export function githubToken(): string | undefined {
+  return env("GITHUB_TOKEN") || env("GITHUB_FALLBACK_TOKEN") || undefined;
+}
+
+function repoPath() {
+  return {
+    token: githubToken(),
+    repo: env("GITHUB_REPO") ?? DEFAULT_REPO,
+    path: env("GITHUB_CONTENT_PATH") ?? DEFAULT_PATH,
+    branch: env("GITHUB_BRANCH") ?? "main",
+  };
+}
+
+function githubHeaders(token: string, raw = false): HeadersInit {
   return {
     Authorization: `Bearer ${token}`,
-    Accept: "application/vnd.github+json",
+    Accept: raw ? "application/vnd.github.raw" : "application/vnd.github+json",
     "X-GitHub-Api-Version": "2022-11-28",
     "User-Agent": "auto-emir-admin",
   };
+}
+
+async function githubMessage(res: Response): Promise<string> {
+  const text = await res.text();
+  try {
+    const parsed = JSON.parse(text) as { message?: string };
+    return parsed.message?.slice(0, 180) || text.slice(0, 180);
+  } catch {
+    return text.slice(0, 180);
+  }
+}
+
+let publishedCache: { at: number; content: SiteContent } | null = null;
+
+export function rememberPublished(content: SiteContent) {
+  publishedCache = { at: Date.now(), content };
+}
+
+/** Latest app-data.json from GitHub, so every visitor sees admin saves without a rebuild. */
+export async function readPublishedContent(): Promise<SiteContent> {
+  if (publishedCache && Date.now() - publishedCache.at < 4000) return publishedCache.content;
+  const { token, repo, path, branch } = repoPath();
+  if (!token) return siteContent;
+  try {
+    const url = `https://api.github.com/repos/${repo}/contents/${path}?ref=${encodeURIComponent(branch)}`;
+    const res = await fetch(url, { headers: githubHeaders(token, true), cache: "no-store" });
+    if (!res.ok) return publishedCache?.content ?? siteContent;
+    const content = parseSiteContent(JSON.parse(await res.text()) as unknown);
+    rememberPublished(content);
+    return content;
+  } catch {
+    return publishedCache?.content ?? siteContent;
+  }
 }
 
 async function readSha(
@@ -33,18 +81,15 @@ async function readSha(
   const res = await fetch(url, { headers: githubHeaders(token) });
   if (res.status === 404) return { branch };
   if (!res.ok) {
-    throw Object.assign(new Error(`github_get_failed:${res.status}`), { status: res.status });
+    const detail = await githubMessage(res);
+    throw new Error(`github_get_failed:${res.status}:${detail}`);
   }
   const data = (await res.json()) as { sha?: string };
   return { sha: data.sha, branch };
 }
 
 export async function publishAppDataJson(content: SiteContent): Promise<GithubPublishResult> {
-  const token = env("GITHUB_TOKEN");
-  const repo = env("GITHUB_REPO") ?? DEFAULT_REPO;
-  const path = env("GITHUB_CONTENT_PATH") ?? DEFAULT_PATH;
-  const preferredBranch = env("GITHUB_BRANCH") ?? "main";
-
+  const { token, repo, path, branch: preferredBranch } = repoPath();
   if (!token) throw new Error("github_not_configured");
 
   const body = toPrettyJson(content);
@@ -85,15 +130,15 @@ export async function publishAppDataJson(content: SiteContent): Promise<GithubPu
   });
 
   if (!putRes.ok) {
-    throw Object.assign(new Error(`github_put_failed:${putRes.status}`), {
-      status: putRes.status,
-    });
+    const detail = await githubMessage(putRes);
+    throw new Error(`github_put_failed:${putRes.status}:${detail}`);
   }
 
   const result = (await putRes.json()) as {
     content?: { html_url?: string };
     commit?: { sha?: string; html_url?: string };
   };
+  rememberPublished(content);
 
   return {
     htmlUrl: result.commit?.html_url ?? result.content?.html_url ?? "",

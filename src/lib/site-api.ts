@@ -171,11 +171,12 @@ export const saveTextsFn = createServerFn({ method: "POST" })
           kz: z.string().max(4000),
         }),
       ),
+      content: siteContentSchema,
     }),
   )
   .handler(async ({ data }) => {
     const { saveTexts } = await import("./site.server.ts");
-    await saveTexts(data.token, data.items);
+    await saveTexts(data.token, data.items, parseSiteContent(data.content));
     return { ok: true };
   });
 
@@ -184,11 +185,12 @@ export const saveContactsFn = createServerFn({ method: "POST" })
     z.object({
       token: z.string().min(8),
       contacts: contactsSchema,
+      content: siteContentSchema,
     }),
   )
   .handler(async ({ data }) => {
     const { saveContacts } = await import("./site.server.ts");
-    await saveContacts(data.token, data.contacts as ContactInfo);
+    await saveContacts(data.token, data.contacts as ContactInfo, parseSiteContent(data.content));
     return { ok: true };
   });
 
@@ -197,18 +199,19 @@ export const saveServiceFn = createServerFn({ method: "POST" })
     z.object({
       token: z.string().min(8),
       service: serviceSchema.extend({ id: z.number().int().optional() }),
+      content: siteContentSchema,
     }),
   )
   .handler(async ({ data }) => {
     const { saveService } = await import("./site.server.ts");
-    return saveService(data.token, data.service);
+    return saveService(data.token, data.service, parseSiteContent(data.content));
   });
 
 export const removeServiceFn = createServerFn({ method: "POST" })
-  .validator(z.object({ token: z.string().min(8), id: z.number().int() }))
+  .validator(z.object({ token: z.string().min(8), id: z.number().int(), content: siteContentSchema }))
   .handler(async ({ data }) => {
     const { removeService } = await import("./site.server.ts");
-    await removeService(data.token, data.id);
+    await removeService(data.token, data.id, parseSiteContent(data.content));
     return { ok: true };
   });
 
@@ -243,11 +246,12 @@ export const saveInstructorsFn = createServerFn({ method: "POST" })
           sortOrder: z.number().int(),
         }),
       ),
+      content: siteContentSchema,
     }),
   )
   .handler(async ({ data }) => {
     const { saveInstructors } = await import("./site.server.ts");
-    await saveInstructors(data.token, data.items as Instructor[]);
+    await saveInstructors(data.token, data.items as Instructor[], parseSiteContent(data.content));
     return { ok: true };
   });
 
@@ -267,11 +271,12 @@ export const saveReviewsFn = createServerFn({ method: "POST" })
           sortOrder: z.number().int(),
         }),
       ),
+      content: siteContentSchema,
     }),
   )
   .handler(async ({ data }) => {
     const { saveReviews } = await import("./site.server.ts");
-    await saveReviews(data.token, data.items as Review[]);
+    await saveReviews(data.token, data.items as Review[], parseSiteContent(data.content));
     return { ok: true };
   });
 
