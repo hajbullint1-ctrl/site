@@ -143,8 +143,12 @@ export async function createBooking(input: {
   return { id };
 }
 
-async function requireAdmin(token: string): Promise<Sql> {
+export function assertAdminToken(token: string) {
   if (!readSignedToken(token)) throw new Error("unauthorized");
+}
+
+async function requireAdmin(token: string): Promise<Sql> {
+  assertAdminToken(token);
   const sql = await getSql();
   await ensureSeeded(sql);
   return sql;

@@ -147,3 +147,35 @@ export async function publishAppDataJson(content: SiteContent): Promise<GithubPu
     commitSha: result.commit?.sha ?? "",
   };
 }
+
+export async function uploadPublicImage(dataUrl: string): Promise<{ url: string; path: string }> {
+  const { token, repo, branch } = repoPath();
+  if (!token) throw new Error("github_not_configured");
+  const match = /^data:image\/(jpeg|jpg|png|webp);base64,([A-Za-z0-9+/=\s]+)$/i.exec(dataUrl.trim());
+  if (!match) throw new Error("bad_image");
+  const kind = match[1].toLowerCase();
+  const ext = kind === "jpeg" || kind === "jpg" ? "jpg" : kind;
+  const encoded = match[2].replace(/\s/g, "");
+  if (encoded.length < 32) throw new Error("bad_image");
+  if (encoded.length > 900_000) throw new Error("image_too_large");
+
+  const path = `public/uploads/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  const putRes = await fetch(`https://api.github.com/repos/${repo}/contents/${path}`, {
+    method: "PUT",
+    headers: {
+      ...githubHeaders(token),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      message: "chore: upload photo from admin",
+      content: encoded,
+      branch,
+    }),
+  });
+  if (!putRes.ok) {
+    const detail = await githubMessage(putRes);
+    throw new Error(`github_put_failed:${putRes.status}:${detail}`);
+  }
+  const url = `https://raw.githubusercontent.com/${repo}/${branch}/${path}`;
+  return { url, path };
+}
