@@ -14,7 +14,15 @@ import { ServicesSection } from "@/components/site/services";
 import { field, t } from "@/lib/i18n";
 import { useSiteContent } from "@/lib/site-content";
 import { telLink, waLink } from "@/lib/utils";
-import type { SitePayload } from "@/lib/site-types";
+import type { Lang, SitePayload } from "@/lib/site-types";
+
+function formatIssued(value: string, lang: Lang): string {
+  if (!value) return "—";
+  const iso = /^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T00:00:00` : value;
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString(lang === "kz" ? "kk-KZ" : "ru-RU");
+}
 
 export function HomeView({ payload }: { payload: SitePayload }) {
   const { lang } = useLang();
@@ -228,6 +236,43 @@ export function HomeView({ payload }: { payload: SitePayload }) {
               </blockquote>
             ))}
           </div>
+        </div>
+      </section>
+
+      <section id="certificates" className="scroll-mt-20 border-t border-border bg-surface/40">
+        <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
+          <SectionHead
+            kicker={t(texts, "certificates.kicker", lang, lang === "kz" ? "Құжаттар" : "Документы")}
+            title={t(
+              texts,
+              "certificates.title",
+              lang,
+              lang === "kz" ? "Дайын сертификаттар" : "Готовые сертификаты",
+            )}
+          />
+          {live.certificates.length === 0 ? (
+            <p className="mt-8 text-sm text-muted">
+              {t(
+                texts,
+                "certificates.empty",
+                lang,
+                lang === "kz" ? "Тізім әзірге бос." : "Список пока пуст.",
+              )}
+            </p>
+          ) : (
+            <ul className="mt-10 divide-y divide-border rounded-xl border border-border bg-bg">
+              {live.certificates.map((item) => (
+                <li key={item.id} className="flex flex-wrap items-baseline justify-between gap-3 px-5 py-4">
+                  <p className="text-base font-medium">{item.name}</p>
+                  <p className="text-sm text-muted">
+                    {t(texts, "certificates.date", lang, lang === "kz" ? "Берілген күні" : "Дата выдачи")}
+                    {": "}
+                    {formatIssued(item.date, lang)}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       </section>
 

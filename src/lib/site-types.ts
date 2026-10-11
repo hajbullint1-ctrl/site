@@ -53,6 +53,13 @@ export type Review = {
   sortOrder: number;
 };
 
+export type Certificate = {
+  id: number;
+  name: string;
+  date: string;
+  sortOrder: number;
+};
+
 export type Booking = {
   id: number;
   name: string;
@@ -77,6 +84,7 @@ export type SiteContent = {
   media: SiteMedia;
   instructors: Instructor[];
   reviews: Review[];
+  certificates: Certificate[];
 };
 
 export type SitePayload = SiteContent & {

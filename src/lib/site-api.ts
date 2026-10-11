@@ -34,9 +34,16 @@ const contactsSchema = z.object({
 });
 
 const mediaSchema = z.object({
-  autodrome: z.string().max(500),
-  lesson: z.string().max(500),
-  theory: z.string().max(500),
+  autodrome: z.string().max(2000),
+  lesson: z.string().max(2000),
+  theory: z.string().max(2000),
+});
+
+const certificateSchema = z.object({
+  id: z.number().int().optional(),
+  name: z.string().max(120),
+  date: z.string().max(40),
+  sortOrder: z.number().int(),
 });
 
 export const siteContentSchema = z.object({
@@ -52,7 +59,7 @@ export const siteContentSchema = z.object({
       nameKz: z.string().max(80),
       roleRu: z.string().max(120),
       roleKz: z.string().max(120),
-      photo: z.string().max(500).optional(),
+      photo: z.string().max(2000).optional(),
       sortOrder: z.number().int(),
     }),
   ),
@@ -64,10 +71,11 @@ export const siteContentSchema = z.object({
       bodyRu: z.string().max(800),
       bodyKz: z.string().max(800),
       rating: z.number().int().min(1).max(5),
-      avatar: z.string().max(500).optional(),
+      avatar: z.string().max(2000).optional(),
       sortOrder: z.number().int(),
     }),
   ),
+  certificates: z.array(certificateSchema).optional(),
 });
 
 export function parseSiteContent(input: unknown): SiteContent {
@@ -112,6 +120,12 @@ export function parseSiteContent(input: unknown): SiteContent {
       bodyKz: item.bodyKz,
       rating: item.rating,
       avatar: item.avatar ?? "",
+      sortOrder: item.sortOrder,
+    })),
+    certificates: (parsed.certificates ?? []).map((item, i) => ({
+      id: item.id ?? i + 1,
+      name: item.name,
+      date: item.date,
       sortOrder: item.sortOrder,
     })),
   };
@@ -242,7 +256,7 @@ export const saveInstructorsFn = createServerFn({ method: "POST" })
           nameKz: z.string().max(80),
           roleRu: z.string().max(120),
           roleKz: z.string().max(120),
-          photo: z.string().max(500).optional(),
+          photo: z.string().max(2000).optional(),
           sortOrder: z.number().int(),
         }),
       ),
@@ -267,7 +281,7 @@ export const saveReviewsFn = createServerFn({ method: "POST" })
           bodyRu: z.string().max(800),
           bodyKz: z.string().max(800),
           rating: z.number().int().min(1).max(5),
-          avatar: z.string().max(500).optional(),
+          avatar: z.string().max(2000).optional(),
           sortOrder: z.number().int(),
         }),
       ),
@@ -278,6 +292,20 @@ export const saveReviewsFn = createServerFn({ method: "POST" })
     const { saveReviews } = await import("./site.server.ts");
     await saveReviews(data.token, data.items as Review[], parseSiteContent(data.content));
     return { ok: true };
+  });
+
+export const uploadImageFn = createServerFn({ method: "POST" })
+  .validator(
+    z.object({
+      token: z.string().min(8).max(500),
+      dataUrl: z.string().min(32).max(1_200_000),
+    }),
+  )
+  .handler(async ({ data }) => {
+    const { assertAdminToken } = await import("./site.server.ts");
+    assertAdminToken(data.token);
+    const { uploadPublicImage } = await import("./github-publish.server.ts");
+    return uploadPublicImage(data.dataUrl);
   });
 
 export const publishSiteFn = createServerFn({ method: "POST" })

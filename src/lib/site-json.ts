@@ -8,6 +8,7 @@ export function contentFromPayload(payload: SitePayload): SiteContent {
     media: payload.media,
     instructors: payload.instructors,
     reviews: payload.reviews,
+    certificates: payload.certificates,
   };
 }
 
@@ -22,6 +23,7 @@ export function toPrettyJson(content: SiteContent): string {
       media: content.media,
       instructors: content.instructors,
       reviews: content.reviews,
+      certificates: content.certificates,
     },
     null,
     2,

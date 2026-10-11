@@ -20,6 +20,7 @@ import {
   saveContactsFn,
   saveServiceFn,
   saveTextsFn,
+  uploadImageFn,
 } from "@/lib/site-api";
 import {
   contentFromPayload,
@@ -28,12 +29,21 @@ import {
   useSiteContent,
 } from "@/lib/site-content";
 import { mapGithubError } from "@/lib/github-errors";
+import { compressImageFile } from "@/lib/image-file";
 import { cn, waLink } from "@/lib/utils";
-import type { ContactInfo, Instructor, Review, Service, SiteMedia, SitePayload } from "@/lib/site-types";
+import type {
+  Certificate,
+  ContactInfo,
+  Instructor,
+  Review,
+  Service,
+  SiteMedia,
+  SitePayload,
+} from "@/lib/site-types";
 
 const TOKEN_KEY = "ae-admin-token";
 const SAVED = "Сохранено в app-data.json. У всех обновится в течение нескольких секунд.";
-type Tab = "texts" | "services" | "contacts" | "bookings" | "team" | "json";
+type Tab = "texts" | "services" | "contacts" | "bookings" | "team" | "certificates" | "json";
 
 export function AdminApp() {
   const [token, setToken] = useState<string | null>(null);
@@ -133,6 +143,7 @@ function AdminShell({ token, onLogout }: { token: string; onLogout: () => void }
     { id: "services", label: "Цены" },
     { id: "contacts", label: "Контакты" },
     { id: "team", label: "Команда и фото" },
+    { id: "certificates", label: "Сертификаты" },
     { id: "bookings", label: `Заявки (${bookings.data?.length ?? 0})` },
     { id: "json", label: "JSON / Резервная копия" },
   ];
@@ -196,6 +207,14 @@ function AdminShell({ token, onLogout }: { token: string; onLogout: () => void }
         {tab === "team" ? (
           <TeamEditor
             key={payload.instructors.map((i) => i.id).join("-")}
+            payload={payload}
+            token={token}
+            onSaved={() => queryClient.invalidateQueries({ queryKey: ["site"] })}
+          />
+        ) : null}
+        {tab === "certificates" ? (
+          <CertificatesEditor
+            key={(payload.certificates ?? []).map((item) => item.id).join("-") || "empty"}
             payload={payload}
             token={token}
             onSaved={() => queryClient.invalidateQueries({ queryKey: ["site"] })}
@@ -632,6 +651,64 @@ function ContactsEditor({
   );
 }
 
+function PhotoField({
+  token,
+  label,
+  value,
+  onChange,
+}: {
+  token: string;
+  label: string;
+  value: string;
+  onChange: (url: string) => void | Promise<void>;
+}) {
+  const [busy, setBusy] = useState(false);
+
+  return (
+    <div className="grid gap-2">
+      <Label>{label}</Label>
+      {value ? (
+        <img src={value} alt="" className="h-28 w-full rounded-lg object-cover" />
+      ) : (
+        <div className="flex h-28 items-center justify-center rounded-lg border border-dashed border-border text-sm text-muted">
+          Нет фото
+        </div>
+      )}
+      <label className="inline-flex">
+        <input
+          type="file"
+          accept="image/jpeg,image/png,image/webp,image/*"
+          className="hidden"
+          disabled={busy}
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            e.target.value = "";
+            if (!file) return;
+            setBusy(true);
+            void (async () => {
+              try {
+                const dataUrl = await compressImageFile(file);
+                const uploaded = await uploadImageFn({ data: { token, dataUrl } });
+                await onChange(uploaded.url);
+              } catch (err) {
+                const message = err instanceof Error ? err.message : "";
+                if (message.includes("image_too_large")) toast.error("Фото слишком большое. Выберите файл меньше.");
+                else if (message.includes("bad_image")) toast.error("Нужен файл JPG, PNG или WebP.");
+                else toast.error(mapGithubError(err));
+              } finally {
+                setBusy(false);
+              }
+            })();
+          }}
+        />
+        <span className="inline-flex h-10 cursor-pointer items-center rounded-md border border-border px-3 text-sm hover:bg-surface">
+          {busy ? "Загрузка…" : "Выбрать файл"}
+        </span>
+      </label>
+    </div>
+  );
+}
+
 function TeamEditor({
   payload,
   token,
@@ -650,13 +727,23 @@ function TeamEditor({
     return items.reduce((max, item) => Math.max(max, item.id), 0) + 1;
   }
 
-  async function persist() {
+  async function publishNow(next?: {
+    instructors?: Instructor[];
+    reviews?: Review[];
+    media?: SiteMedia;
+  }) {
     setPending(true);
+    const instructorsNext = next?.instructors ?? instructors;
+    const reviewsNext = next?.reviews ?? reviews;
+    const mediaNext = next?.media ?? media;
+    if (next?.instructors) setInstructors(instructorsNext);
+    if (next?.reviews) setReviews(reviewsNext);
+    if (next?.media) setMedia(mediaNext);
     const content = {
       ...contentFromPayload(payload),
-      instructors,
-      reviews,
-      media,
+      instructors: instructorsNext,
+      reviews: reviewsNext,
+      media: mediaNext,
     };
     saveLocalContent(content);
     try {
@@ -675,30 +762,27 @@ function TeamEditor({
       <section>
         <h1 className="font-display text-2xl">Фото и дизайн</h1>
         <p className="mt-2 text-sm text-muted">
-          Ссылка на картинку: адрес в интернете или путь вроде /images/lesson.jpg
+          Выберите файл — фото сожмётся, загрузится и сразу появится на сайте.
         </p>
         <div className="mt-4 grid gap-3 md:grid-cols-3">
-          <Field label="Автодром">
-            <Input
-              value={media.autodrome}
-              onChange={(e) => setMedia({ ...media, autodrome: e.target.value })}
-              placeholder="https://..."
-            />
-          </Field>
-          <Field label="Практика">
-            <Input
-              value={media.lesson}
-              onChange={(e) => setMedia({ ...media, lesson: e.target.value })}
-              placeholder="https://..."
-            />
-          </Field>
-          <Field label="Теория">
-            <Input
-              value={media.theory}
-              onChange={(e) => setMedia({ ...media, theory: e.target.value })}
-              placeholder="https://..."
-            />
-          </Field>
+          <PhotoField
+            token={token}
+            label="Автодром"
+            value={media.autodrome}
+            onChange={(url) => publishNow({ media: { ...media, autodrome: url } })}
+          />
+          <PhotoField
+            token={token}
+            label="Практика"
+            value={media.lesson}
+            onChange={(url) => publishNow({ media: { ...media, lesson: url } })}
+          />
+          <PhotoField
+            token={token}
+            label="Теория"
+            value={media.theory}
+            onChange={(url) => publishNow({ media: { ...media, theory: url } })}
+          />
         </div>
       </section>
       <section>
@@ -758,17 +842,18 @@ function TeamEditor({
                   }
                 />
               </Field>
-              <Field label="Фото (ссылка)" className="sm:col-span-2">
-                <Input
+              <div className="sm:col-span-5">
+                <PhotoField
+                  token={token}
+                  label="Фото"
                   value={p.photo}
-                  placeholder="https://..."
-                  onChange={(e) =>
-                    setInstructors((list) =>
-                      list.map((x, i) => (i === idx ? { ...x, photo: e.target.value } : x)),
-                    )
+                  onChange={(url) =>
+                    publishNow({
+                      instructors: instructors.map((x, i) => (i === idx ? { ...x, photo: url } : x)),
+                    })
                   }
                 />
-              </Field>
+              </div>
             </div>
           ))}
         </div>
@@ -842,17 +927,18 @@ function TeamEditor({
                   }
                 />
               </Field>
-              <Field label="Аватар (ссылка)" className="md:col-span-2">
-                <Input
+              <div className="md:col-span-2">
+                <PhotoField
+                  token={token}
+                  label="Аватар"
                   value={r.avatar}
-                  placeholder="https://..."
-                  onChange={(e) =>
-                    setReviews((list) =>
-                      list.map((x, i) => (i === idx ? { ...x, avatar: e.target.value } : x)),
-                    )
+                  onChange={(url) =>
+                    publishNow({
+                      reviews: reviews.map((x, i) => (i === idx ? { ...x, avatar: url } : x)),
+                    })
                   }
                 />
-              </Field>
+              </div>
               <div className="md:col-span-2">
                 <Button
                   variant="outline"
@@ -866,10 +952,95 @@ function TeamEditor({
         </div>
       </section>
       <div className="flex flex-wrap gap-2">
-        <Button disabled={pending} onClick={() => void persist()}>
+        <Button disabled={pending} onClick={() => void publishNow()}>
           Сохранить
         </Button>
       </div>
+    </div>
+  );
+}
+
+function CertificatesEditor({
+  payload,
+  token,
+  onSaved,
+}: {
+  payload: SitePayload;
+  token: string;
+  onSaved: () => void;
+}) {
+  const [items, setItems] = useState<Certificate[]>(payload.certificates ?? []);
+  const [pending, setPending] = useState(false);
+
+  function nextId(list: { id: number }[]) {
+    return list.reduce((max, item) => Math.max(max, item.id), 0) + 1;
+  }
+
+  async function save() {
+    setPending(true);
+    const certificates = items.map((item, index) => ({ ...item, sortOrder: index + 1 }));
+    const content = { ...contentFromPayload(payload), certificates };
+    saveLocalContent(content);
+    try {
+      await publishSiteFn({ data: { token, content } });
+      toast.success(SAVED);
+      onSaved();
+    } catch (err) {
+      toast.error(mapGithubError(err));
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="font-display text-2xl">Сертификаты</h1>
+        <Button
+          variant="outline"
+          onClick={() =>
+            setItems((list) => [
+              ...list,
+              { id: nextId(list), name: "", date: "", sortOrder: list.length + 1 },
+            ])
+          }
+        >
+          Добавить
+        </Button>
+      </div>
+      <p className="mt-2 text-sm text-muted">ФИО ученика и дата выдачи. Список может быть пустым.</p>
+      <div className="mt-6 space-y-3">
+        {items.length === 0 ? <p className="text-sm text-muted">Пока нет записей.</p> : null}
+        {items.map((item, idx) => (
+          <div key={`${item.id}-${idx}`} className="grid gap-3 rounded-lg border border-border bg-surface p-4 md:grid-cols-[1fr_180px_auto]">
+            <Field label="ФИО">
+              <Input
+                value={item.name}
+                onChange={(e) =>
+                  setItems((list) => list.map((row, i) => (i === idx ? { ...row, name: e.target.value } : row)))
+                }
+              />
+            </Field>
+            <Field label="Дата">
+              <Input
+                type="date"
+                value={item.date}
+                onChange={(e) =>
+                  setItems((list) => list.map((row, i) => (i === idx ? { ...row, date: e.target.value } : row)))
+                }
+              />
+            </Field>
+            <div className="flex items-end">
+              <Button variant="outline" onClick={() => setItems((list) => list.filter((_, i) => i !== idx))}>
+                Удалить
+              </Button>
+            </div>
+          </div>
+        ))}
+      </div>
+      <Button className="mt-6" disabled={pending} onClick={() => void save()}>
+        Сохранить
+      </Button>
     </div>
   );
 }

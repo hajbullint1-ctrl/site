@@ -25,6 +25,9 @@ function asContent(raw: typeof appData): SiteContent {
     reviews: [...raw.reviews]
       .map((item) => ({ ...item, avatar: item.avatar ?? "" }))
       .sort((a, b) => a.sortOrder - b.sortOrder),
+    certificates: ([...(raw.certificates ?? [])] as SiteContent["certificates"]).sort(
+      (a, b) => a.sortOrder - b.sortOrder,
+    ),
   };
 }
 
@@ -51,6 +54,7 @@ export function readLocalContent(): SiteContent | null {
         ...item,
         avatar: item.avatar ?? "",
       })),
+      certificates: parsed.certificates ?? siteContent.certificates,
     };
   } catch {
     return null;
@@ -96,6 +100,7 @@ export function useSiteContent(server?: SitePayload | null): SitePayload {
       media: { ...DEFAULT_MEDIA, ...fallback.media },
       instructors: fallback.instructors?.length ? fallback.instructors : siteContent.instructors,
       reviews: fallback.reviews?.length ? fallback.reviews : siteContent.reviews,
+      certificates: fallback.certificates ?? siteContent.certificates,
       bookingCount: fallback.bookingCount,
     };
   }
