@@ -16,6 +16,8 @@ import { useSiteContent } from "@/lib/site-content";
 import { telLink, waLink } from "@/lib/utils";
 import type { Lang, SitePayload } from "@/lib/site-types";
 
+const MAP_2GIS = "https://2gis.kz/turkestan/geo/70000001104980724";
+
 function formatIssued(value: string, lang: Lang): string {
   if (!value) return "—";
   const iso = /^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T00:00:00` : value;
@@ -324,6 +326,8 @@ export function HomeView({ payload }: { payload: SitePayload }) {
               <ContactRow
                 label={t(texts, "contacts.address", lang)}
                 value={field(live.contacts, lang, "addressRu", "addressKz")}
+                href={MAP_2GIS}
+                external
               />
               <ContactRow
                 label={t(texts, "contacts.hours", lang)}
@@ -331,14 +335,26 @@ export function HomeView({ payload }: { payload: SitePayload }) {
               />
             </dl>
           </div>
-          <div className="overflow-hidden rounded-xl border border-border bg-surface">
+          <div className="relative overflow-hidden rounded-xl border border-border bg-surface">
             <iframe
               title={t(texts, "contacts.map", lang)}
-              className="h-72 w-full grayscale contrast-125 lg:h-full min-h-72"
+              className="pointer-events-none h-72 w-full grayscale contrast-125 lg:h-full min-h-72"
               loading="lazy"
               referrerPolicy="no-referrer-when-downgrade"
               src={`https://www.openstreetmap.org/export/embed.html?bbox=${Number(live.contacts.lng) - 0.01}%2C${Number(live.contacts.lat) - 0.008}%2C${Number(live.contacts.lng) + 0.01}%2C${Number(live.contacts.lat) + 0.008}&layer=mapnik&marker=${live.contacts.lat}%2C${live.contacts.lng}`}
             />
+            <a
+              href={MAP_2GIS}
+              target="_blank"
+              rel="noreferrer"
+              className="absolute inset-0"
+              aria-label={lang === "kz" ? "2ГИС-те ашу" : "Открыть в 2ГИС"}
+            />
+            <Button asChild className="absolute bottom-3 right-3 z-10">
+              <a href={MAP_2GIS} target="_blank" rel="noreferrer">
+                {lang === "kz" ? "2ГИС-те ашу" : "Открыть в 2ГИС"}
+              </a>
+            </Button>
           </div>
         </div>
       </section>
@@ -396,17 +412,23 @@ function ContactRow({
   label,
   value,
   href,
+  external,
 }: {
   label: string;
   value: string;
   href?: string;
+  external?: boolean;
 }) {
   return (
     <div>
       <dt className="text-xs uppercase tracking-[0.16em] text-muted">{label}</dt>
       <dd className="mt-1 text-base">
         {href ? (
-          <a href={href} className="hover:underline">
+          <a
+            href={href}
+            className="hover:underline"
+            {...(external ? { target: "_blank", rel: "noreferrer" } : {})}
+          >
             {value}
           </a>
         ) : (
