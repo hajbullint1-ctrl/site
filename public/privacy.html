@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Политика конфиденциальности — AvtoEmir</title>
+  <meta name="description" content="Политика конфиденциальности приложения AvtoEmir: сбор данных, документы, HTTPS, хранение и удаление." />
+  <style>
+    body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background: #f8fafc; color: #0f172a; line-height: 1.55; }
+    .wrap { max-width: 42rem; margin: 0 auto; padding: 2.5rem 1rem; }
+    article { background: #fff; border: 1px solid #e2e8f0; border-radius: 1rem; padding: 1.5rem; box-shadow: 0 1px 2px rgba(15,23,42,0.04); }
+    .brand { color: #2563eb; font-weight: 600; font-size: 0.875rem; margin: 0; }
+    h1 { margin: 0.25rem 0 0; font-size: 1.5rem; }
+    .updated { margin: 0.5rem 0 0; font-size: 0.75rem; color: #64748b; }
+    h2 { margin: 1.25rem 0 0.4rem; font-size: 1rem; }
+    p, li { font-size: 0.9rem; color: #334155; }
+    ul { padding-left: 1.25rem; }
+    a { color: #2563eb; }
+    .links { margin-top: 2rem; display: flex; flex-wrap: wrap; gap: 1rem; font-size: 0.875rem; }
+    .links a.danger { color: #dc2626; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <article>
+      <p class="brand">AvtoEmir</p>
+      <h1>Политика конфиденциальности</h1>
+      <p class="updated">Последнее обновление: 27 октября 2026</p>
+
+      <h2>1. Кто мы</h2>
+      <p>Приложение AvtoEmir предназначено для учеников автошколы: регистрация, загрузка документов, теория ПДД, тесты, запись на вождение и связь с администрацией.</p>
+
+      <h2>2. Какие данные собираем</h2>
+      <ul>
+        <li>Имя и номер телефона при регистрации</li>
+        <li>Загруженные документы заявки: сканы / фото удостоверения личности, медицинских и иных справок</li>
+        <li>Прогресс теории и результаты тестов</li>
+        <li>Сообщения в чате с администрацией / инструктором</li>
+        <li>Технические данные работы приложения (сессия входа)</li>
+      </ul>
+
+      <h2>3. Зачем используем</h2>
+      <p>Для работы автошколы: проверка документов, обучение, запись на занятия, поддержка учеников. Данные не используются для рекламы третьих лиц.</p>
+
+      <h2>4. Передача третьим лицам</h2>
+      <p>Мы не продаём персональные данные. Хостинг и облако (Vercel, Supabase) используются только для работы сервиса. Документы видит администрация автошколы при проверке заявки.</p>
+
+      <h2>5. Хранение, передача и защита документов</h2>
+      <p><strong>Передача.</strong> Все данные, включая сканы документов, передаются только по <strong>HTTPS</strong> (TLS). Незащищённый HTTP для загрузки не используется.</p>
+      <p><strong>Хранение.</strong> Файлы — в Supabase Storage, сведения о заявке — в базе Supabase. У провайдера включено шифрование при хранении (encryption at rest).</p>
+      <p><strong>Пароли.</strong> Хранятся в виде криптографического хеша, не открытым текстом.</p>
+      <p><strong>Доступ.</strong> Документы доступны ученику и администрации автошколы.</p>
+
+      <h2>6. Удаление данных</h2>
+      <p>Удалите аккаунт в приложении AvtoEmir или отправьте запрос на странице удаления. Связанные данные и документы заявки будут удалены из рабочих систем сервиса.</p>
+      <p><a href="/delete-account.html">Запросить удаление аккаунта →</a></p>
+
+      <h2>7. Контакты</h2>
+      <p>По вопросам данных используйте контакты поддержки в приложении AvtoEmir.</p>
+
+      <div class="links">
+        <a class="danger" href="/delete-account.html">Удаление аккаунта</a>
+        <a href="/">На главную</a>
+      </div>
+    </article>
+  </div>
+</body>
+</html>
