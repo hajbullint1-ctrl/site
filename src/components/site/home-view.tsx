@@ -362,9 +362,17 @@ export function HomeView({ payload }: { payload: SitePayload }) {
       <footer className="border-t border-border">
         <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-8 text-sm text-muted sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <p>{t(texts, "footer.rights", lang)}</p>
-          <a href="/admin" className="text-subtle hover:text-fg">
-            {t(texts, "footer.admin", lang)}
-          </a>
+          <div className="flex flex-wrap items-center gap-4">
+            <a href="/privacy.html" className="text-subtle hover:text-fg">
+              {lang === "kz" ? "Құпиялылық саясаты" : "Политика конфиденциальности"}
+            </a>
+            <a href="/delete-account.html" className="text-subtle hover:text-fg">
+              {lang === "kz" ? "Аккаунтты жою" : "Удаление аккаунта"}
+            </a>
+            <a href="/admin" className="text-subtle hover:text-fg">
+              {t(texts, "footer.admin", lang)}
+            </a>
+          </div>
         </div>
       </footer>
 
