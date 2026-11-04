@@ -4,9 +4,10 @@ import { formatClock } from "@/lib/utils";
 const START_KEY = "ae-visit-start";
 
 function hourBase(hour: number): number {
-  if (hour >= 9 && hour < 18) return 16;
-  if (hour >= 18 && hour < 22) return 9;
-  return 4;
+  // +5 к базовым значениям для более живой статистики
+  if (hour >= 9 && hour < 18) return 21;
+  if (hour >= 18 && hour < 22) return 14;
+  return 9;
 }
 
 export function useOnlineCount(): number {
