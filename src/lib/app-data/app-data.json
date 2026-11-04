@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-11-04T08:21:17.353Z",
+  "updatedAt": "2026-11-04T08:23:12.226Z",
   "texts": {
     "meta.title": {
       "ru": "Авто-Эмир — автошкола в Туркестане",
@@ -461,12 +461,5 @@
       "sortOrder": 3
     }
   ],
-  "certificates": [
-    {
-      "id": 1,
-      "name": "Кабанбаева Диляфруз",
-      "date": "2026-10-14",
-      "sortOrder": 1
-    }
-  ]
+  "certificates": []
 }
