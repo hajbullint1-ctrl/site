@@ -1,43 +1,4 @@
 import { cn } from "@/lib/utils";
 
-export function LogoMark({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 40 40"
-      className={cn("size-9", className)}
-      aria-hidden="true"
-    >
-      <circle cx="20" cy="20" r="18.5" fill="none" stroke="currentColor" strokeWidth="1.4" />
-      <circle cx="20" cy="20" r="6.5" fill="none" stroke="currentColor" strokeWidth="1.3" />
-      <path
-        d="M20 2.2v6.2M20 31.6v6.2M2.2 20h6.2M31.6 20h6.2"
-        stroke="currentColor"
-        strokeWidth="1.2"
-        strokeLinecap="round"
-      />
-      <path
-        d="M13.2 30.2 20 11.5l6.8 18.7"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinejoin="round"
-        strokeLinecap="round"
-      />
-      <path d="M15.8 23.6h8.4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-export function BrandLockup({ className }: { className?: string }) {
-  return (
-    <span className={cn("flex items-center gap-2.5 text-fg", className)}>
-      <LogoMark className="size-8 shrink-0" />
-      <span className="flex flex-col leading-none">
-        <span className="font-display text-[15px] font-medium tracking-tight">Авто-Эмир</span>
-        <span className="mt-0.5 text-[10px] uppercase tracking-[0.18em] text-muted">
-          автошкола
-        </span>
-      </span>
-    </span>
-  );
-}
+const LOGO_SRC =
+  "data:image/jpeg;base64,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
