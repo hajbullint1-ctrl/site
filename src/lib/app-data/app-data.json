@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-10-11T16:27:49.740Z",
+  "updatedAt": "2026-11-04T08:19:02.678Z",
   "texts": {
     "meta.title": {
       "ru": "Авто-Эмир — автошкола в Туркестане",
@@ -393,7 +393,7 @@
     "enrolledBase": 75
   },
   "media": {
-    "autodrome": "/images/autodrome.jpg",
+    "autodrome": "https://raw.githubusercontent.com/hajbullint1-ctrl/site/main/public/uploads/1793780339472-ggqqoz.jpg",
     "lesson": "/images/lesson.jpg",
     "theory": "/images/theory.jpg"
   },
