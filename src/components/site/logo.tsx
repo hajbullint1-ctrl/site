@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 export function LogoMark({ className }: { className?: string }) {
   return (
     <img
-      src="/images/logo.png"
+      src="/images/logo.svg"
       alt=""
       className={cn("size-9 rounded-full object-cover", className)}
       width={36}
@@ -17,7 +17,7 @@ export function BrandLockup({ className }: { className?: string }) {
   return (
     <span className={cn("flex items-center gap-2.5 text-fg", className)}>
       <img
-        src="/images/logo.png"
+        src="/images/logo.svg"
         alt="Авто-Эмир"
         className="size-9 shrink-0 rounded-full object-cover"
         width={36}
