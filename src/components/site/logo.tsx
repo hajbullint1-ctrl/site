@@ -1,9 +1,12 @@
 import { cn } from "@/lib/utils";
 
+const LOGO_SRC =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAvXklEQVR42sW7Z5QV1bY2/Ky1q";
+
 export function LogoMark({ className }: { className?: string }) {
   return (
     <img
-      src="/images/logo.svg"
+      src={LOGO_SRC}
       alt=""
       className={cn("size-9 rounded-full object-cover", className)}
       width={36}
@@ -17,7 +20,7 @@ export function BrandLockup({ className }: { className?: string }) {
   return (
     <span className={cn("flex items-center gap-2.5 text-fg", className)}>
       <img
-        src="/images/logo.svg"
+        src={LOGO_SRC}
         alt="Авто-Эмир"
         className="size-9 shrink-0 rounded-full object-cover"
         width={36}
