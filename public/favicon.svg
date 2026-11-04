@@ -1,3 +1,18 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <image width="32" height="32" href="data:image/jpeg;base64,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"/>
+  <circle cx="16" cy="16" r="15" fill="#0B2A5B"/>
+  <circle cx="16" cy="16" r="13.5" fill="none" stroke="#F5C518" stroke-width="1.2"/>
+  <circle cx="16" cy="16" r="11.5" fill="none" stroke="#1E5AA8" stroke-width="1"/>
+  <!-- steering wheel -->
+  <circle cx="16" cy="13" r="5" fill="none" stroke="#E8EEF7" stroke-width="1.4"/>
+  <circle cx="16" cy="13" r="1.8" fill="#E8EEF7"/>
+  <path d="M16 8v3.2M12.2 15.5l2.2-1.5M19.8 15.5l-2.2-1.5" stroke="#E8EEF7" stroke-width="1.2" stroke-linecap="round"/>
+  <!-- crown -->
+  <path d="M12.5 8.2 L14 6.2 L16 8 L18 6.2 L19.5 8.2 Z" fill="#E53935"/>
+  <!-- car body -->
+  <ellipse cx="16" cy="22.2" rx="7.5" ry="2.8" fill="#E53935"/>
+  <path d="M10 22.2 Q10 19.5 13 18.5 L19 18.5 Q22 19.5 22 22.2" fill="#C62828"/>
+  <circle cx="12.2" cy="23.2" r="1.3" fill="#1a1a1a"/>
+  <circle cx="19.8" cy="23.2" r="1.3" fill="#1a1a1a"/>
+  <circle cx="12.2" cy="23.2" r="0.5" fill="#ccc"/>
+  <circle cx="19.8" cy="23.2" r="0.5" fill="#ccc"/>
 </svg>
