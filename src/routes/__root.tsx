@@ -34,10 +34,14 @@ export const Route = createRootRoute({
       { name: "twitter:image", content: `${SITE_URL}/og.jpg` },
     ],
     links: [
+      // Google prefers PNG favicons that are multiples of 48px
+      { rel: "icon", type: "image/png", sizes: "48x48", href: "/favicon-48.png" },
+      { rel: "icon", type: "image/png", sizes: "192x192", href: "/favicon-192.png" },
+      { rel: "icon", type: "image/png", sizes: "512x512", href: "/favicon-512.png" },
       { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },
+      { rel: "apple-touch-icon", sizes: "180x180", href: "/apple-touch-icon.png" },
       { rel: "stylesheet", href: appCss },
-      { rel: "manifest", href: "/__grok/manifest.webmanifest" },
-      { rel: "apple-touch-icon", href: "/__grok/icon-180.png" },
+      { rel: "manifest", href: "/manifest.webmanifest" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
@@ -50,6 +54,28 @@ export const Route = createRootRoute({
     <html lang="ru" suppressHydrationWarning>
       <head>
         <HeadContent />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "DrivingSchool",
+              name: APP_NAME,
+              url: SITE_URL,
+              logo: `${SITE_URL}/favicon-512.png`,
+              image: `${SITE_URL}/og.jpg`,
+              description: APP_DESC,
+              telephone: "+77083425171",
+              address: {
+                "@type": "PostalAddress",
+                streetAddress: "проспект Тауке хана, 287",
+                addressLocality: "Туркестан",
+                addressCountry: "KZ",
+              },
+              sameAs: ["https://www.instagram.com/avtoshkola_turkestan_avtoemir"],
+            }),
+          }}
+        />
       </head>
       <body className="antialiased">
         <PreviewHostBridge />
